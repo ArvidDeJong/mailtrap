@@ -22,20 +22,35 @@ class EmailValidation extends Model
         'last_checked_at' => 'datetime'
     ];
 
-    public static function validateEmail(string $email): bool
+    public static function validateEmail(string $email): ?string
     {
+        // Controleer eerst of er al een record bestaat
+        $existingValidation = static::where('email', $email)->first();
+
+        if ($existingValidation) {
+            // Als het record bestaat en niet valid is, return de foutmelding
+            if ($existingValidation->status !== 'valid') {
+                return $existingValidation->reason;
+            }
+            // Als het record bestaat en valid is, return null (geen fout)
+            return null;
+        }
+
+        // Geen bestaand record gevonden, voer volledige validatie uit
         $domain = substr(strrchr($email, "@"), 1);
 
         // Basic validation
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            static::saveValidation($email, 'blocked', 'Invalid email format', 400);
-            return false;
+            $errorMessage = 'Invalid email format';
+            static::saveValidation($email, 'blocked', $errorMessage, 400);
+            return $errorMessage;
         }
 
         // Check MX records
         if (!checkdnsrr($domain, 'MX')) {
-            static::saveValidation($email, 'blocked', 'No valid mail server found for domain', 400);
-            return false;
+            $errorMessage = 'No valid mail server found for domain';
+            static::saveValidation($email, 'blocked', $errorMessage, 400);
+            return $errorMessage;
         }
         // Controleer of een van de MX records naar een geldig IP-adres verwijst
         $mxHosts = [];
@@ -50,17 +65,19 @@ class EmailValidation extends Model
                 }
             }
             if (!$validIp) {
-                static::saveValidation($email, 'blocked', 'MX record verwijst niet naar geldig IP-adres', 400);
-                return false;
+                $errorMessage = 'MX record verwijst niet naar geldig IP-adres';
+                static::saveValidation($email, 'blocked', $errorMessage, 400);
+                return $errorMessage;
             }
         } else {
-            static::saveValidation($email, 'blocked', 'MX records niet gevonden', 400);
-            return false;
+            $errorMessage = 'MX records niet gevonden';
+            static::saveValidation($email, 'blocked', $errorMessage, 400);
+            return $errorMessage;
         }
 
         // If all checks pass, mark as valid
         static::saveValidation($email, 'valid', 'All checks passed', 200);
-        return true;
+        return null;
     }
 
     public static function saveValidation($email, $status, $reason, $status_code)
@@ -172,7 +189,7 @@ class EmailValidation extends Model
             if (isset($existingValidations[$email])) {
                 $validation = $existingValidations[$email];
                 $status = $validation->status;
-                
+
                 if ($status === 'valid') {
                     $result['valid']++;
                     $result['details'][$email] = [
@@ -226,7 +243,7 @@ class EmailValidation extends Model
             // Valideer elk ontbrekend mailadres
             foreach ($missingEmails as $email) {
                 $isValid = static::validateEmail($email);
-                
+
                 // Update het resultaat
                 $result['not_exists']--;
                 if ($isValid) {

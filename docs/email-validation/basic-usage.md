@@ -31,8 +31,8 @@ The model uses the `email_validations` table with the following fields:
 ```php
 use Darvis\Mailtrap\Models\EmailValidation;
 
-// Validate an email address
-$isValid = EmailValidation::validateEmail('user@example.com');
+// Validate an email address (returns null if valid, error message if invalid)
+$errorMessage = EmailValidation::validateEmail('user@example.com');
 
 // Check if an email address is blocked
 $isBlocked = EmailValidation::isBlocked('user@example.com');
@@ -61,10 +61,11 @@ EmailValidation::markAsBlocked('user@example.com', 'Spam domain', '403');
 ```php
 $email = 'user@example.com';
 
-if (EmailValidation::validateEmail($email)) {
+$errorMessage = EmailValidation::validateEmail($email);
+if ($errorMessage === null) {
     echo "Email is valid and can be used";
 } else {
-    echo "Email is invalid or blocked";
+    echo "Email is invalid or blocked: " . $errorMessage;
 }
 ```
 

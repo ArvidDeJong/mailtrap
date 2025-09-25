@@ -81,9 +81,9 @@ class UserRegistrationController extends Controller
         
         if ($quickCheck['not_exists'] > 0) {
             // Email is unknown, validate it
-            $isValid = EmailValidation::validateEmail($email);
+            $errorMessage = EmailValidation::validateEmail($email);
             
-            if ($isValid) {
+            if ($errorMessage === null) {
                 // Registration can proceed
                 $user = User::create([
                     'email' => $email,
@@ -99,7 +99,7 @@ class UserRegistrationController extends Controller
                 // Show error message
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid email address'
+                    'message' => 'Invalid email address: ' . $errorMessage
                 ], 422);
             }
         } else {
@@ -340,14 +340,14 @@ class EmailValidationController extends Controller
             ]);
         } else {
             // New email, validate it
-            $isValid = EmailValidation::validateEmail($email);
+            $errorMessage = EmailValidation::validateEmail($email);
             
             // Get the validation details
             $validation = EmailValidation::where('email', $email)->first();
             
             return response()->json([
                 'email' => $email,
-                'is_valid' => $isValid,
+                'is_valid' => $errorMessage === null,
                 'status' => $validation->status,
                 'reason' => $validation->reason,
                 'last_checked' => $validation->last_checked_at,
@@ -473,9 +473,11 @@ $allEmails->chunk(1000)->each(function ($emailChunk) {
 $email = 'user@example.com';
 $cacheKey = "email_validation:" . md5($email);
 
-$isValid = Cache::remember($cacheKey, 3600, function () use ($email) {
+$errorMessage = Cache::remember($cacheKey, 3600, function () use ($email) {
     return EmailValidation::validateEmail($email);
 });
+
+$isValid = $errorMessage === null;
 ```
 
 ## Next Steps

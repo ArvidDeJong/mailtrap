@@ -4,21 +4,21 @@ Complete reference for all EmailValidation model methods.
 
 ## Static Methods
 
-### `validateEmail(string $email): bool`
+### `validateEmail(string $email): ?string`
 Validates an email address and stores the result in the database.
 
 **Parameters:**
 - `$email` - The email address to validate
 
-**Return:** `true` if valid, `false` if invalid
+**Return:** `null` if valid, error message string if invalid
 
 **Example:**
 ```php
-$isValid = EmailValidation::validateEmail('user@example.com');
-if ($isValid) {
+$errorMessage = EmailValidation::validateEmail('user@example.com');
+if ($errorMessage === null) {
     echo "Email is valid";
 } else {
-    echo "Email is invalid or blocked";
+    echo "Email is invalid: " . $errorMessage;
 }
 ```
 
@@ -252,16 +252,19 @@ try {
 
 ### Validation Failures
 
-When `validateEmail()` returns `false`, check the database record for details:
+When `validateEmail()` returns an error message, the details are automatically stored in the database:
 
 ```php
 $email = 'test@example.com';
-$isValid = EmailValidation::validateEmail($email);
+$errorMessage = EmailValidation::validateEmail($email);
 
-if (!$isValid) {
+if ($errorMessage !== null) {
+    echo "Validation failed: " . $errorMessage;
+    
+    // Optional: Get additional details from database
     $validation = EmailValidation::where('email', $email)->first();
-    echo "Validation failed: " . $validation->reason;
     echo "Status code: " . $validation->status_code;
+    echo "Last checked: " . $validation->last_checked_at;
 }
 ```
 

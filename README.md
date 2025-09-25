@@ -10,8 +10,9 @@ A powerful Laravel package for Mailtrap integration with comprehensive email val
 ```php
 use Darvis\Mailtrap\Models\EmailValidation;
 
-// Validate a single email address
-$isValid = EmailValidation::validateEmail('user@example.com');
+// Validate a single email address (returns null if valid, error message if invalid)
+$errorMessage = EmailValidation::validateEmail('user@example.com');
+$isValid = $errorMessage === null;
 
 // Bulk validation of multiple email addresses
 $emails = ['user1@test.com', 'user2@example.com', 'user3@invalid.domain'];

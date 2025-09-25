@@ -25,7 +25,8 @@ The model automatically caches validation results. Use this to your advantage:
 
 ```php
 // First call validates and stores in database
-$isValid = EmailValidation::validateEmail('user@example.com');
+$errorMessage = EmailValidation::validateEmail('user@example.com');
+$isValid = $errorMessage === null;
 
 // Subsequent calls use cached result (fast)
 $isStillValid = EmailValidation::isValid('user@example.com');
@@ -97,7 +98,8 @@ try {
 
 ```php
 try {
-    $isValid = EmailValidation::validateEmail($email);
+    $errorMessage = EmailValidation::validateEmail($email);
+    $isValid = $errorMessage === null;
 } catch (QueryException $e) {
     Log::error('Database error during email validation', [
         'email' => $email,
@@ -305,7 +307,8 @@ Don't expose too much information about validation results:
 ```php
 public function publicValidation(string $email): array
 {
-    $isValid = EmailValidation::validateEmail($email);
+    $errorMessage = EmailValidation::validateEmail($email);
+    $isValid = $errorMessage === null;
     
     // Only return basic validation status, not detailed reasons
     return [
@@ -369,9 +372,9 @@ public function test_email_validation_with_mock()
         return [['type' => 'MX', 'target' => 'mail.example.com']];
     });
     
-    $result = EmailValidation::validateEmail('test@example.com');
+    $errorMessage = EmailValidation::validateEmail('test@example.com');
     
-    $this->assertTrue($result);
+    $this->assertNull($errorMessage);
 }
 ```
 
@@ -383,10 +386,10 @@ public function test_handles_database_errors_gracefully()
     // Simulate database error
     DB::shouldReceive('table')->andThrow(new QueryException('Connection failed'));
     
-    $result = EmailValidation::validateEmail('test@example.com');
+    $errorMessage = EmailValidation::validateEmail('test@example.com');
     
-    // Should fallback to basic validation
-    $this->assertFalse($result);
+    // Should return error message or fallback
+    $this->assertNotNull($errorMessage);
 }
 ```
 
@@ -416,7 +419,8 @@ public function test_bulk_validation_performance()
 ```php
 // ❌ Bad
 foreach ($users as $user) {
-    if (EmailValidation::validateEmail($user->email)) {
+    $errorMessage = EmailValidation::validateEmail($user->email);
+    if ($errorMessage === null) {
         // Send email
     }
 }
@@ -434,11 +438,11 @@ $validEmails = collect($result['details'])
 
 ```php
 // ❌ Bad - Always validates, ignoring cache
-EmailValidation::validateEmail($email);
+$errorMessage = EmailValidation::validateEmail($email);
 
 // ✅ Good - Check cache first
 if (!EmailValidation::isValid($email)) {
-    EmailValidation::validateEmail($email);
+    $errorMessage = EmailValidation::validateEmail($email);
 }
 ```
 

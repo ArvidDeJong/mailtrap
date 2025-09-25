@@ -58,8 +58,9 @@ Performance and maintenance guidelines:
 ```php
 use Darvis\Mailtrap\Models\EmailValidation;
 
-// Validate a single email
-$isValid = EmailValidation::validateEmail('user@example.com');
+// Validate a single email (returns null if valid, error message if invalid)
+$errorMessage = EmailValidation::validateEmail('user@example.com');
+$isValid = $errorMessage === null;
 
 // Bulk validation
 $emails = ['user1@test.com', 'user2@example.com'];
