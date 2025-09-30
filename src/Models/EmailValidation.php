@@ -132,22 +132,6 @@ class EmailValidation extends Model
         );
     }
 
-    public static function markAsValidWithCode(string $email, ?int $statusCode = 200): self
-    {
-        $domain = substr(strrchr($email, "@"), 1);
-
-        return static::updateOrCreate(
-            ['email' => $email],
-            [
-                'domain' => $domain,
-                'status' => 'valid',
-                'reason' => 'Email validated successfully',
-                'status_code' => $statusCode,
-                'last_checked_at' => now()
-            ]
-        );
-    }
-
     public static function markAsInvalid(string $email, string $reason, ?string $statusCode = null): self
     {
         $domain = substr(strrchr($email, "@"), 1);

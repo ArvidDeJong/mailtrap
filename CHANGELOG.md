@@ -5,14 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.3] - 2025-09-30
+## [1.0.4] - 2025-09-30
 
 ### Added
 - **Mailtrap Response Code Support**: Enhanced webhook processing to handle `response_code` from Mailtrap events
   - `MailtrapWebhookController` now extracts and processes `response_code` from webhook events
   - `EmailValidation` model stores response codes in `status_code` field
   - `MailLog` model gets updated with response codes based on `message_id`
-  - New `markAsValidWithCode()` method for valid emails with status codes
 
 ### Improved
 - **Enhanced Webhook Processing**:
@@ -22,22 +21,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Open/Click events get status_code 200 confirming successful delivery
   - Spam/Reject events use Mailtrap response_code or fallback to default values
 
+- **Enhanced MailServiceProvider**:
+  - Improved email validation flow with better performance
+  - Enhanced blocked email handling with proper MailLog creation
+  - Better code organization with early variable initialization
+  - Removed redundant `isBlocked()` check in validation flow
+  - Added comprehensive MailLog entry for blocked emails with status_code 550
+
 - **Dual Model Updates**:
   - `EmailValidation` tracks email address validity with response codes
   - `MailLog` tracks individual message status with response codes
   - Both models maintain consistent status_code information
   - Enhanced logging includes response_code and response text for debugging
 
+### Changed
+- **Simplified EmailValidation API**: Removed `markAsValidWithCode()` method in favor of using existing `markAsValid()` method
+- **Streamlined validation logic**: Removed redundant blocked email check in MailServiceProvider
+
 ### Technical Details
 - Added `$responseCode` and `$response` extraction from Mailtrap webhook events
 - All event types (delivery, bounce, spam, reject, open, click) now handle response codes appropriately
 - MailLog updates are conditional on `message_id` availability for safety
 - Backwards compatible with existing webhooks that don't include response_code
+- Improved performance by reducing duplicate database queries in email validation flow
 
 ### Files Changed
 - `src/Http/Controllers/MailtrapWebhookController.php`: Enhanced webhook processing
-- `src/Models/EmailValidation.php`: Added `markAsValidWithCode()` method
+- `src/Models/EmailValidation.php`: Simplified API by removing `markAsValidWithCode()` method
+- `src/Providers/MailServiceProvider.php`: Enhanced email validation and logging flow
 - `tests/WebhookResponseCodeExample.php`: Added example of new functionality
+
+## [1.0.3] - 2025-09-30
+
+### Placeholder
+- Reserved for future changes
 
 ## [1.0.2] - 2025-09-30
 

@@ -24,27 +24,42 @@ class MailServiceProvider extends ServiceProvider
             $message = $event->message;
             $addresses = collect($message->getTo())->map(fn($address) => $address->getAddress());
 
+            // Get headers and sender early for logging
+            $headers = $message->getHeaders();
+            $sender = collect($message->getFrom())->first()->getAddress();
+
             foreach ($addresses as $email) {
                 // Validate email if not validated yet
-                if (!EmailValidation::isValid($email) && !EmailValidation::isBlocked($email)) {
+                if (!EmailValidation::isValid($email)) {
                     EmailValidation::validateEmail($email);
                 }
 
                 // Check if email is blocked after validation
                 if (EmailValidation::isBlocked($email)) {
+                    // Generate message ID if not exists for logging
+                    $messageId = $headers->has('X-Message-ID')
+                        ? $headers->get('X-Message-ID')->getBodyAsString()
+                        : Str::uuid()->toString();
+
+                    MailLog::create([
+                        'message_id' => $messageId,
+                        'sender' => $sender,
+                        'recipient' => $email,
+                        'subject' => $message->getSubject(),
+                        'status_code' => 550,
+                        'type' => $headers->has('X-Mail-Type') ? $headers->get('X-Mail-Type')->getBodyAsString() : null,
+                        'model' => $headers->has('X-Mail-Model') ? $headers->get('X-Mail-Model')->getBodyAsString() : null,
+                        'model_id' => $headers->has('X-Mail-Model-ID') ? (int) $headers->get('X-Mail-Model-ID')->getBodyAsString() : null,
+                    ]);
                     throw new TransportException("Email address {$email} is blocked");
                 }
 
                 // Always generate a new unique message ID for each sending attempt
                 $messageId = Str::uuid()->toString();
-                if ($message->getHeaders()->has('X-Message-ID')) {
-                    $message->getHeaders()->remove('X-Message-ID');
+                if ($headers->has('X-Message-ID')) {
+                    $headers->remove('X-Message-ID');
                 }
-                $message->getHeaders()->addTextHeader('X-Message-ID', $messageId);
-
-                // Log the email attempt
-                $sender = collect($message->getFrom())->first()->getAddress();
-                $headers = $message->getHeaders();
+                $headers->addTextHeader('X-Message-ID', $messageId);
 
                 try {
                     MailLog::create([

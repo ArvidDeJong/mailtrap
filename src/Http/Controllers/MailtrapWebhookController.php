@@ -73,7 +73,7 @@ class MailtrapWebhookController extends Controller
                     case 'delivery':
                         // Een succesvolle aflevering betekent dat het e-mailadres geldig is
                         // Bij delivery events stuurt Mailtrap geen response_code, dus gebruiken we 200
-                        EmailValidation::markAsValidWithCode($email, $responseCode ?? 200);
+                        EmailValidation::markAsValid($email);
                         
                         // Update MailLog met succesvolle status
                         if ($messageId) {
@@ -165,7 +165,7 @@ class MailtrapWebhookController extends Controller
                     case 'click':
                         // Deze events betekenen impliciet dat het e-mailadres geldig is
                         // (gebruiker heeft e-mail geopend of op een link geklikt)
-                        EmailValidation::markAsValidWithCode($email, $responseCode ?? 200);
+                        EmailValidation::markAsValid($email);
                         
                         // Update MailLog met succesvolle status (open/click betekent succesvolle aflevering)
                         if ($messageId) {
