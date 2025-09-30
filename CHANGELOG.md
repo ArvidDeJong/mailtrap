@@ -53,8 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.3] - 2025-09-30
 
-### Placeholder
-- Reserved for future changes
+### Note
+- This version was tagged in git but corresponds to the changes now documented in v1.0.4
+- See v1.0.4 for the actual feature additions and improvements
 
 ## [1.0.2] - 2025-09-30
 
