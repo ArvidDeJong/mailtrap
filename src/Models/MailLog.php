@@ -48,6 +48,17 @@ class MailLog extends Model
         $data['source_file'] = $sourceFile;
         $data['source_line'] = $caller['line'] ?? null;
 
+        // Generate unique message_id if not provided
+        if (empty($data['message_id'])) {
+            $prefix = match (true) {
+                ($data['status_code'] ?? null) === 400 => 'VALIDATION_ERROR_',
+                ($data['status_code'] ?? null) === 500 => 'TRANSPORT_ERROR_',
+                ($data['status_code'] ?? null) === 550 => 'BLOCKED_',
+                default => 'ERROR_',
+            };
+            $data['message_id'] = $prefix . uniqid();
+        }
+
         return static::create($data);
     }
 
