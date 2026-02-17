@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2026-02-17
+
+### Fixed
+
+- **Migration robustness**: Check if unique constraint exists before trying to drop it
+  - Prevents migration failure when `mail_logs_message_id_unique` index doesn't exist
+  - Uses native MySQL `SHOW INDEX` query for compatibility with Laravel 11+
+
+## [1.0.8] - 2026-02-17
+
+### Fixed
+
+- **Laravel 11+ compatibility**: Removed Doctrine DBAL dependency from migration
+  - `getDoctrineSchemaManager()` was removed in Laravel 11
+  - Now uses native MySQL `SHOW INDEX` query to check for existing indexes
+
 ## [1.0.7] - 2026-02-17
 
 ### Fixed

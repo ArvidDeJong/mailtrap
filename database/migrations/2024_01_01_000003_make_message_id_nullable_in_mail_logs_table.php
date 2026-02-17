@@ -27,15 +27,16 @@ return new class extends Migration
                 }
             });
 
-            // Drop unique constraint if it exists and replace with index
-            Schema::table('mail_logs', function (Blueprint $table) {
-                // Try to drop the unique constraint (may not exist)
-                try {
+            // Drop unique constraint if it exists (check first to avoid error)
+            $uniqueExists = collect(
+                \Illuminate\Support\Facades\DB::select("SHOW INDEX FROM mail_logs WHERE Key_name = 'mail_logs_message_id_unique'")
+            )->isNotEmpty();
+
+            if ($uniqueExists) {
+                Schema::table('mail_logs', function (Blueprint $table) {
                     $table->dropUnique('mail_logs_message_id_unique');
-                } catch (\Exception $e) {
-                    // Constraint doesn't exist, ignore
-                }
-            });
+                });
+            }
 
             // Add index if it doesn't exist (Laravel 11+ compatible)
             $indexExists = collect(
