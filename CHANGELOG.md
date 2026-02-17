@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.5] - 2026-02-17
+## [1.0.7] - 2026-02-17
+
+### Fixed
+
+- **MailLog message_id now nullable**: Fixed database error when logging blocked emails
+  - `message_id` field is now nullable to support logging blocked emails that were never sent
+  - `sender` field is now nullable for blocked email scenarios
+  - Replaced unique constraint with index on `message_id` for better flexibility
+  - Added migration `2024_01_01_000003_make_message_id_nullable_in_mail_logs_table.php` for existing databases
+
+### Migration Required
+
+Run `php artisan migrate` to apply the schema changes for existing installations.
+
+## [1.0.6] - 2026-02-17
 
 ### Added
 

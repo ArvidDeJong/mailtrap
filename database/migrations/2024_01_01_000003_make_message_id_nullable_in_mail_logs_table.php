@@ -1,0 +1,70 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     * 
+     * This migration makes message_id and sender nullable to support
+     * logging blocked emails that were never sent (no message_id available).
+     */
+    public function up(): void
+    {
+        if (Schema::hasTable('mail_logs')) {
+            Schema::table('mail_logs', function (Blueprint $table) {
+                // Make message_id nullable for blocked emails
+                if (Schema::hasColumn('mail_logs', 'message_id')) {
+                    $table->string('message_id')->nullable()->change();
+                }
+                
+                // Make sender nullable for blocked emails
+                if (Schema::hasColumn('mail_logs', 'sender')) {
+                    $table->string('sender')->nullable()->change();
+                }
+            });
+
+            // Drop unique constraint if it exists and replace with index
+            Schema::table('mail_logs', function (Blueprint $table) {
+                // Try to drop the unique constraint (may not exist)
+                try {
+                    $table->dropUnique('mail_logs_message_id_unique');
+                } catch (\Exception $e) {
+                    // Constraint doesn't exist, ignore
+                }
+            });
+
+            // Add index if it doesn't exist
+            Schema::table('mail_logs', function (Blueprint $table) {
+                $sm = Schema::getConnection()->getDoctrineSchemaManager();
+                $indexes = $sm->listTableIndexes('mail_logs');
+                
+                if (!isset($indexes['mail_logs_message_id_index'])) {
+                    $table->index('message_id', 'mail_logs_message_id_index');
+                }
+            });
+        }
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        if (Schema::hasTable('mail_logs')) {
+            Schema::table('mail_logs', function (Blueprint $table) {
+                // Revert to non-nullable (will fail if null values exist)
+                if (Schema::hasColumn('mail_logs', 'message_id')) {
+                    $table->string('message_id')->nullable(false)->change();
+                }
+                
+                if (Schema::hasColumn('mail_logs', 'sender')) {
+                    $table->string('sender')->nullable(false)->change();
+                }
+            });
+        }
+    }
+};

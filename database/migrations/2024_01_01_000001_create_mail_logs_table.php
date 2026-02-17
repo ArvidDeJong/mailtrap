@@ -15,8 +15,8 @@ return new class extends Migration
         if (!Schema::hasTable('mail_logs')) {
             Schema::create('mail_logs', function (Blueprint $table) {
                 $table->id();
-                $table->string('message_id');
-                $table->string('sender');
+                $table->string('message_id')->nullable(); // Nullable for blocked emails without message_id
+                $table->string('sender')->nullable();
                 $table->string('recipient');
                 $table->string('subject');
                 $table->string('status_code')->nullable();
@@ -25,8 +25,8 @@ return new class extends Migration
                 $table->string('model')->nullable();
                 $table->unsignedBigInteger('model_id')->nullable();
                 
-                // Unique constraint op message_id
-                $table->unique('message_id', 'mail_logs_message_id_unique');
+                // Index on message_id for lookups (not unique since can be null)
+                $table->index('message_id', 'mail_logs_message_id_index');
             });
         }
     }
