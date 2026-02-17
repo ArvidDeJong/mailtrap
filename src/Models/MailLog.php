@@ -12,14 +12,44 @@ class MailLog extends Model
         'recipient',
         'subject',
         'status_code',
+        'error_message',
+        'source_file',
+        'source_line',
         'type',
         'model',
         'model_id'
     ];
 
     protected $casts = [
-        'model_id' => 'integer'
+        'model_id' => 'integer',
+        'source_line' => 'integer'
     ];
+
+    /**
+     * Create a MailLog entry with automatic source file and line tracking
+     *
+     * @param array $data The MailLog data
+     * @return static
+     */
+    public static function createWithSource(array $data): static
+    {
+        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+        $caller = $backtrace[1] ?? $backtrace[0];
+
+        $sourceFile = $caller['file'] ?? null;
+        if ($sourceFile) {
+            // Store relative path from base_path
+            $basePath = base_path() . DIRECTORY_SEPARATOR;
+            if (str_starts_with($sourceFile, $basePath)) {
+                $sourceFile = substr($sourceFile, strlen($basePath));
+            }
+        }
+
+        $data['source_file'] = $sourceFile;
+        $data['source_line'] = $caller['line'] ?? null;
+
+        return static::create($data);
+    }
 
     /**
      * Scope voor succesvolle emails

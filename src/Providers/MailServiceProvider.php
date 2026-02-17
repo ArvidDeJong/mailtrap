@@ -41,17 +41,20 @@ class MailServiceProvider extends ServiceProvider
                         ? $headers->get('X-Message-ID')->getBodyAsString()
                         : Str::uuid()->toString();
 
-                    MailLog::create([
+                    $blockReason = EmailValidation::getBlockReason($email) ?? 'Email address is blocked';
+
+                    MailLog::createWithSource([
                         'message_id' => $messageId,
                         'sender' => $sender,
                         'recipient' => $email,
                         'subject' => $message->getSubject(),
                         'status_code' => 550,
+                        'error_message' => $blockReason,
                         'type' => $headers->has('X-Mail-Type') ? $headers->get('X-Mail-Type')->getBodyAsString() : null,
                         'model' => $headers->has('X-Mail-Model') ? $headers->get('X-Mail-Model')->getBodyAsString() : null,
                         'model_id' => $headers->has('X-Mail-Model-ID') ? (int) $headers->get('X-Mail-Model-ID')->getBodyAsString() : null,
                     ]);
-                    throw new TransportException("Email address {$email} is blocked");
+                    throw new TransportException("Email address {$email} is blocked: {$blockReason}");
                 }
 
                 // Always generate a new unique message ID for each sending attempt

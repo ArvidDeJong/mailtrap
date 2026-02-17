@@ -3,7 +3,6 @@
 namespace Darvis\Mailtrap\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 
 class EmailValidation extends Model
 {
@@ -104,6 +103,25 @@ class EmailValidation extends Model
                 ->orWhere('domain', $domain);
         })->where('status', 'blocked')
             ->exists();
+    }
+
+    /**
+     * Get the reason why an email is blocked
+     *
+     * @param string $email
+     * @return string|null
+     */
+    public static function getBlockReason(string $email): ?string
+    {
+        $domain = substr(strrchr($email, "@"), 1);
+
+        $validation = static::where(function ($query) use ($email, $domain) {
+            $query->where('email', $email)
+                ->orWhere('domain', $domain);
+        })->where('status', 'blocked')
+            ->first();
+
+        return $validation?->reason;
     }
 
     public static function isValid(string $email): bool

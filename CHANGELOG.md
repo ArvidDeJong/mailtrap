@@ -5,15 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-02-17
+
+### Added
+
+- **Error Tracking for MailLog**: Added new columns to track error details and source location
+  - `error_message`: Stores the error message when email sending fails
+  - `source_file`: Stores the file path where the MailLog entry was created
+  - `source_line`: Stores the line number where the MailLog entry was created
+
+- **MailLog::createWithSource() Helper Method**: New static method that automatically captures caller location
+  - Uses `debug_backtrace()` to capture source file and line
+  - Stores relative paths from `base_path()` for cleaner logs
+  - Drop-in replacement for `MailLog::create()` with automatic source tracking
+
+- **EmailValidation::getBlockReason() Method**: New method to retrieve the reason why an email is blocked
+  - Returns the `reason` field from blocked email records
+  - Used by MailServiceProvider to provide detailed error messages
+
+### Changed
+
+- **MailServiceProvider**: Enhanced blocked email handling
+  - Now uses `createWithSource()` for automatic source tracking
+  - Includes `error_message` with detailed block reason
+  - Exception message now includes the block reason for better debugging
+
+### Migration
+
+- Added `2024_01_01_000002_add_error_tracking_to_mail_logs_table.php`
+  - Adds `error_message`, `source_file`, and `source_line` columns
+  - Safe migration with column existence checks
+
 ## [1.0.4] - 2025-09-30
 
 ### Added
+
 - **Mailtrap Response Code Support**: Enhanced webhook processing to handle `response_code` from Mailtrap events
   - `MailtrapWebhookController` now extracts and processes `response_code` from webhook events
   - `EmailValidation` model stores response codes in `status_code` field
   - `MailLog` model gets updated with response codes based on `message_id`
 
 ### Improved
+
 - **Enhanced Webhook Processing**:
   - Bounce events now use actual Mailtrap `response_code` (e.g., 555, 550) instead of hardcoded values
   - Response text from Mailtrap is used as primary reason (fallback to existing logic)
@@ -35,10 +68,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced logging includes response_code and response text for debugging
 
 ### Changed
+
 - **Simplified EmailValidation API**: Removed `markAsValidWithCode()` method in favor of using existing `markAsValid()` method
 - **Streamlined validation logic**: Removed redundant blocked email check in MailServiceProvider
 
 ### Technical Details
+
 - Added `$responseCode` and `$response` extraction from Mailtrap webhook events
 - All event types (delivery, bounce, spam, reject, open, click) now handle response codes appropriately
 - MailLog updates are conditional on `message_id` availability for safety
@@ -46,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved performance by reducing duplicate database queries in email validation flow
 
 ### Files Changed
+
 - `src/Http/Controllers/MailtrapWebhookController.php`: Enhanced webhook processing
 - `src/Models/EmailValidation.php`: Simplified API by removing `markAsValidWithCode()` method
 - `src/Providers/MailServiceProvider.php`: Enhanced email validation and logging flow
@@ -54,18 +90,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.3] - 2025-09-30
 
 ### Note
+
 - This version was tagged in git but corresponds to the changes now documented in v1.0.4
 - See v1.0.4 for the actual feature additions and improvements
 
 ## [1.0.2] - 2025-09-30
 
 ### Improved
+
 - Enhanced route registration in `MailtrapServiceProvider`
   - Added proper API prefix (`/api`) to all package routes
   - Added API middleware group for better request handling
   - Improved code formatting and consistency
 
 ### Technical Details
+
 - Routes are now properly prefixed with `/api` and use the `api` middleware group
 - This ensures better integration with Laravel's API routing conventions
 - Improved string concatenation formatting throughout the service provider
@@ -73,23 +112,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.1] - 2025-09-25
 
 ### Changed
+
 - **BREAKING**: `EmailValidation::validateEmail()` now returns `?string` instead of `bool`
   - Returns `null` when email is valid
   - Returns error message string when email is invalid or blocked
   - This provides more detailed feedback about validation failures
 
 ### Improved
+
 - Enhanced email validation with more detailed error messages
 - Better MX record validation with IP address verification
 - Improved caching mechanism for existing validations
 - More comprehensive DNS validation checks
 
 ### Fixed
+
 - Fixed issue where validation would not check existing records first
 - Improved error handling for DNS lookup failures
 - Better handling of MX records that don't resolve to valid IP addresses
 
 ### Documentation
+
 - Updated all documentation to reflect new `validateEmail()` return type
 - Updated API reference with correct method signatures
 - Updated all code examples in documentation
@@ -97,6 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated best practices guide with new patterns
 
 ### Technical Details
+
 - The `validateEmail()` method now performs these checks in order:
   1. Check existing validation record in database
   2. Basic email format validation
@@ -106,9 +150,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bulk validation methods remain unchanged and fully compatible
 
 ### Migration Guide
+
 If you're upgrading from version 1.0.0, update your code as follows:
 
 **Before (v1.0.0):**
+
 ```php
 $isValid = EmailValidation::validateEmail('user@example.com');
 if ($isValid) {
@@ -119,6 +165,7 @@ if ($isValid) {
 ```
 
 **After (v1.0.1):**
+
 ```php
 $errorMessage = EmailValidation::validateEmail('user@example.com');
 if ($errorMessage === null) {
@@ -132,6 +179,7 @@ if ($errorMessage === null) {
 ## [1.0.0] - 2025-09-24
 
 ### Added
+
 - Initial release of the Darvis Mailtrap package
 - EmailValidation model with comprehensive validation features
 - Bulk validation capabilities
@@ -148,6 +196,7 @@ if ($errorMessage === null) {
 - Event listeners for automatic email validation
 
 ### Features
+
 - **Email Validation**
   - Format validation using PHP's built-in filters
   - MX record verification
