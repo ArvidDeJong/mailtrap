@@ -37,15 +37,16 @@ return new class extends Migration
                 }
             });
 
-            // Add index if it doesn't exist
-            Schema::table('mail_logs', function (Blueprint $table) {
-                $sm = Schema::getConnection()->getDoctrineSchemaManager();
-                $indexes = $sm->listTableIndexes('mail_logs');
-                
-                if (!isset($indexes['mail_logs_message_id_index'])) {
+            // Add index if it doesn't exist (Laravel 11+ compatible)
+            $indexExists = collect(
+                \Illuminate\Support\Facades\DB::select("SHOW INDEX FROM mail_logs WHERE Key_name = 'mail_logs_message_id_index'")
+            )->isNotEmpty();
+
+            if (!$indexExists) {
+                Schema::table('mail_logs', function (Blueprint $table) {
                     $table->index('message_id', 'mail_logs_message_id_index');
-                }
-            });
+                });
+            }
         }
     }
 
