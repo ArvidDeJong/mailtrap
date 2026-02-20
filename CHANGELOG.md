@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10] - 2026-02-20
+
+### Added
+
+- **Pest testing framework**: Added Pest PHP for modern, expressive testing
+  - Added `pestphp/pest` and `pestphp/pest-plugin-laravel` as dev dependencies
+  - Added `composer test` script to run Pest tests
+  - Created `tests/Pest.php` configuration file
+
+- **Webhook controller tests**: Added test coverage for MailLog webhook upsert logic
+  - Test for creating MailLog when message_id doesn't exist
+  - Test for updating existing MailLog without creating duplicates
+
+- **MailLog upsert functionality**: Webhook controller now creates MailLog records when they don't exist
+  - Added `upsertMailLogFromWebhook()` method to handle upsert logic
+  - Webhook events now capture `sending_domain_name` for new records
+  - New records include `category` in subject and `response` as error message
+
+### Changed
+
+- **Base controller**: Changed from `App\Http\Controllers\Controller` to `Illuminate\Routing\Controller` for better package compatibility
+- **PHPUnit**: Updated from `^10.0` to `^11.0`
+- **TestCase improvements**: Added SQLite in-memory database configuration and automatic migration loading
+
 ## [1.0.9] - 2026-02-17
 
 ### Fixed

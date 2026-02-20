@@ -2,14 +2,48 @@
 
 namespace Darvis\Mailtrap\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Darvis\Mailtrap\Models\EmailValidation;
 use Darvis\Mailtrap\Models\MailLog;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 
 class MailtrapWebhookController extends Controller
 {
+    /**
+     * Werk een bestaand MailLog record bij op message_id, of maak een nieuw record aan.
+     */
+    private function upsertMailLogFromWebhook(
+        ?string $messageId,
+        string $email,
+        string $eventType,
+        ?string $statusCode,
+        ?string $reason,
+        ?string $sendingDomainName = null,
+        ?string $category = null
+    ): void {
+        if (!$messageId) {
+            return;
+        }
+
+        $updatedRows = MailLog::where('message_id', $messageId)
+            ->update(['status_code' => $statusCode]);
+
+        if ($updatedRows > 0) {
+            return;
+        }
+
+        MailLog::create([
+            'message_id' => $messageId,
+            'sender' => $sendingDomainName,
+            'recipient' => $email,
+            'subject' => $category ?? 'Mailtrap webhook ' . $eventType,
+            'status_code' => $statusCode,
+            'error_message' => $reason,
+            'type' => 'webhook',
+        ]);
+    }
+
     /**
      * Verwerkt de inkomende webhook verzoeken van Mailtrap.
      *
@@ -56,6 +90,7 @@ class MailtrapWebhookController extends Controller
             $category = $event['category'] ?? null;
             $timestamp = $event['timestamp'] ?? null;
             $sendingStream = $event['sending_stream'] ?? null;
+            $sendingDomainName = $event['sending_domain_name'] ?? null;
             $responseCode = $event['response_code'] ?? null;
             $response = $event['response'] ?? null;
 
@@ -76,10 +111,15 @@ class MailtrapWebhookController extends Controller
                         EmailValidation::markAsValid($email);
                         
                         // Update MailLog met succesvolle status
-                        if ($messageId) {
-                            MailLog::where('message_id', $messageId)
-                                ->update(['status_code' => $responseCode ?? 200]);
-                        }
+                        $this->upsertMailLogFromWebhook(
+                            $messageId,
+                            $email,
+                            $eventType,
+                            (string) ($responseCode ?? 200),
+                            null,
+                            $sendingDomainName,
+                            $category
+                        );
                         
                         Log::info("Email {$email} gemarkeerd als geldig via Mailtrap webhook (delivery event)", [
                             'message_id' => $messageId,
@@ -97,10 +137,15 @@ class MailtrapWebhookController extends Controller
                         EmailValidation::markAsInvalid($email, $reason, $responseCode ?? 550);
                         
                         // Update MailLog met bounce status
-                        if ($messageId) {
-                            MailLog::where('message_id', $messageId)
-                                ->update(['status_code' => $responseCode ?? 550]);
-                        }
+                        $this->upsertMailLogFromWebhook(
+                            $messageId,
+                            $email,
+                            $eventType,
+                            (string) ($responseCode ?? 550),
+                            $reason,
+                            $sendingDomainName,
+                            $category
+                        );
                         
                         Log::info("Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (bounce event)", [
                             'message_id' => $messageId,
@@ -121,10 +166,15 @@ class MailtrapWebhookController extends Controller
                         EmailValidation::markAsInvalid($email, $reason, $responseCode ?? 400);
                         
                         // Update MailLog met spam status
-                        if ($messageId) {
-                            MailLog::where('message_id', $messageId)
-                                ->update(['status_code' => $responseCode ?? 400]);
-                        }
+                        $this->upsertMailLogFromWebhook(
+                            $messageId,
+                            $email,
+                            $eventType,
+                            (string) ($responseCode ?? 400),
+                            $reason,
+                            $sendingDomainName,
+                            $category
+                        );
                         
                         Log::info("Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (spam event)", [
                             'message_id' => $messageId,
@@ -144,10 +194,15 @@ class MailtrapWebhookController extends Controller
                         EmailValidation::markAsInvalid($email, $reason, $responseCode ?? 450);
                         
                         // Update MailLog met reject status
-                        if ($messageId) {
-                            MailLog::where('message_id', $messageId)
-                                ->update(['status_code' => $responseCode ?? 450]);
-                        }
+                        $this->upsertMailLogFromWebhook(
+                            $messageId,
+                            $email,
+                            $eventType,
+                            (string) ($responseCode ?? 450),
+                            $reason,
+                            $sendingDomainName,
+                            $category
+                        );
                         
                         Log::info("Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (reject event)", [
                             'message_id' => $messageId,
@@ -168,10 +223,15 @@ class MailtrapWebhookController extends Controller
                         EmailValidation::markAsValid($email);
                         
                         // Update MailLog met succesvolle status (open/click betekent succesvolle aflevering)
-                        if ($messageId) {
-                            MailLog::where('message_id', $messageId)
-                                ->update(['status_code' => $responseCode ?? 200]);
-                        }
+                        $this->upsertMailLogFromWebhook(
+                            $messageId,
+                            $email,
+                            $eventType,
+                            (string) ($responseCode ?? 200),
+                            null,
+                            $sendingDomainName,
+                            $category
+                        );
                         
                         Log::info("Email {$email} gemarkeerd als geldig via Mailtrap webhook ({$eventType} event)", [
                             'message_id' => $messageId,
