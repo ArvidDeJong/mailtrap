@@ -11,6 +11,18 @@ use Illuminate\Support\Facades\Log;
 class MailtrapWebhookController extends Controller
 {
     /**
+     * Schrijf alleen naar de Laravel Log facade als dat in de config is ingeschakeld.
+     */
+    private function log(string $level, string $message, array $context = []): void
+    {
+        if (!config('manta_mailtrap.logging.log_to_laravel', false)) {
+            return;
+        }
+
+        Log::{$level}($message, $context);
+    }
+
+    /**
      * Werk een bestaand MailLog record bij op message_id, of maak een nieuw record aan.
      */
     private function upsertMailLogFromWebhook(
@@ -59,7 +71,7 @@ class MailtrapWebhookController extends Controller
         $startTime = microtime(true);
 
         // Log de inkomende webhook voor debugging
-        Log::info('Mailtrap webhook ontvangen', [
+        $this->log('info', 'Mailtrap webhook ontvangen', [
             'payload' => $request->all()
         ]);
 
@@ -121,7 +133,7 @@ class MailtrapWebhookController extends Controller
                             $category
                         );
                         
-                        Log::info("Email {$email} gemarkeerd als geldig via Mailtrap webhook (delivery event)", [
+                        $this->log('info', "Email {$email} gemarkeerd als geldig via Mailtrap webhook (delivery event)", [
                             'message_id' => $messageId,
                             'category' => $category,
                             'timestamp' => $timestamp,
@@ -147,7 +159,7 @@ class MailtrapWebhookController extends Controller
                             $category
                         );
                         
-                        Log::info("Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (bounce event)", [
+                        $this->log('info', "Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (bounce event)", [
                             'message_id' => $messageId,
                             'category' => $category,
                             'reason' => $reason,
@@ -176,7 +188,7 @@ class MailtrapWebhookController extends Controller
                             $category
                         );
                         
-                        Log::info("Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (spam event)", [
+                        $this->log('info', "Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (spam event)", [
                             'message_id' => $messageId,
                             'category' => $category,
                             'reason' => $reason,
@@ -204,7 +216,7 @@ class MailtrapWebhookController extends Controller
                             $category
                         );
                         
-                        Log::info("Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (reject event)", [
+                        $this->log('info', "Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (reject event)", [
                             'message_id' => $messageId,
                             'category' => $category,
                             'reason' => $reason,
@@ -233,7 +245,7 @@ class MailtrapWebhookController extends Controller
                             $category
                         );
                         
-                        Log::info("Email {$email} gemarkeerd als geldig via Mailtrap webhook ({$eventType} event)", [
+                        $this->log('info', "Email {$email} gemarkeerd als geldig via Mailtrap webhook ({$eventType} event)", [
                             'message_id' => $messageId,
                             'category' => $category,
                             'timestamp' => $timestamp,
@@ -246,7 +258,7 @@ class MailtrapWebhookController extends Controller
                     // Andere events kunnen worden toegevoegd indien nodig
                     default:
                         // Voor andere events doen we niets met de e-mailvalidatie
-                        Log::info("Mailtrap event {$eventType} ontvangen voor {$email}, geen actie ondernomen", [
+                        $this->log('info', "Mailtrap event {$eventType} ontvangen voor {$email}, geen actie ondernomen", [
                             'message_id' => $messageId,
                             'category' => $category,
                             'timestamp' => $timestamp,
@@ -256,7 +268,7 @@ class MailtrapWebhookController extends Controller
                         break;
                 }
             } catch (\Exception $e) {
-                Log::error("Fout bij verwerken van Mailtrap webhook voor {$email}", [
+                $this->log('error', "Fout bij verwerken van Mailtrap webhook voor {$email}", [
                     'error' => $e->getMessage(),
                     'event_type' => $eventType,
                     'message_id' => $messageId,

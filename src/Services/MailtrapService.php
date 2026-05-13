@@ -61,7 +61,9 @@ class MailtrapService
             // Return true for valid email
             return true;
         } catch (\Exception $e) {
-            Log::error('Mailtrap API error: ' . $e->getMessage());
+            if (config('manta_mailtrap.logging.log_to_laravel', false)) {
+                Log::error('Mailtrap API error: ' . $e->getMessage());
+            }
 
             // Unexpected errors should block the email to prevent excessive retries
             $this->handleFailure($email, 'API error: ' . $e->getMessage());

@@ -48,6 +48,9 @@ return [
         'log_successful' => env('MAILTRAP_LOG_SUCCESSFUL', true),
         'log_failed' => env('MAILTRAP_LOG_FAILED', true),
         'cleanup_after_days' => env('MAILTRAP_CLEANUP_AFTER_DAYS', 30),
+
+        // Schrijf events ook naar de Laravel Log facade (standaard uit).
+        'log_to_laravel' => env('MAILTRAP_LOG_TO_LARAVEL', false),
     ],
 
     /*
