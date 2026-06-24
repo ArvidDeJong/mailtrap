@@ -14,11 +14,11 @@ class EmailValidation extends Model
         'status',
         'reason',
         'status_code',
-        'last_checked_at'
+        'last_checked_at',
     ];
 
     protected $casts = [
-        'last_checked_at' => 'datetime'
+        'last_checked_at' => 'datetime',
     ];
 
     public static function validateEmail(string $email): ?string
@@ -31,24 +31,27 @@ class EmailValidation extends Model
             if ($existingValidation->status !== 'valid') {
                 return $existingValidation->reason;
             }
+
             // Als het record bestaat en valid is, return null (geen fout)
             return null;
         }
 
         // Geen bestaand record gevonden, voer volledige validatie uit
-        $domain = substr(strrchr($email, "@"), 1);
+        $domain = substr(strrchr($email, '@'), 1);
 
         // Basic validation
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $errorMessage = 'Invalid email format';
             static::saveValidation($email, 'blocked', $errorMessage, 400);
+
             return $errorMessage;
         }
 
         // Check MX records
-        if (!checkdnsrr($domain, 'MX')) {
+        if (! checkdnsrr($domain, 'MX')) {
             $errorMessage = 'No valid mail server found for domain';
             static::saveValidation($email, 'blocked', $errorMessage, 400);
+
             return $errorMessage;
         }
         // Controleer of een van de MX records naar een geldig IP-adres verwijst
@@ -63,19 +66,22 @@ class EmailValidation extends Model
                     break;
                 }
             }
-            if (!$validIp) {
+            if (! $validIp) {
                 $errorMessage = 'MX record verwijst niet naar geldig IP-adres';
                 static::saveValidation($email, 'blocked', $errorMessage, 400);
+
                 return $errorMessage;
             }
         } else {
             $errorMessage = 'MX records niet gevonden';
             static::saveValidation($email, 'blocked', $errorMessage, 400);
+
             return $errorMessage;
         }
 
         // If all checks pass, mark as valid
         static::saveValidation($email, 'valid', 'All checks passed', 200);
+
         return null;
     }
 
@@ -83,20 +89,20 @@ class EmailValidation extends Model
     {
         $data = [
             'email' => $email,
-            'domain' => substr(strrchr($email, "@"), 1),
+            'domain' => substr(strrchr($email, '@'), 1),
             'status' => $status,
             'reason' => $reason,
             'status_code' => $status_code,
             'last_checked_at' => now(),
         ];
         static::updateOrCreate([
-            'email' => $email
+            'email' => $email,
         ], $data);
     }
 
     public static function isBlocked(string $email): bool
     {
-        $domain = substr(strrchr($email, "@"), 1);
+        $domain = substr(strrchr($email, '@'), 1);
 
         return static::where(function ($query) use ($email, $domain) {
             $query->where('email', $email)
@@ -107,13 +113,10 @@ class EmailValidation extends Model
 
     /**
      * Get the reason why an email is blocked
-     *
-     * @param string $email
-     * @return string|null
      */
     public static function getBlockReason(string $email): ?string
     {
-        $domain = substr(strrchr($email, "@"), 1);
+        $domain = substr(strrchr($email, '@'), 1);
 
         $validation = static::where(function ($query) use ($email, $domain) {
             $query->where('email', $email)
@@ -126,7 +129,7 @@ class EmailValidation extends Model
 
     public static function isValid(string $email): bool
     {
-        $domain = substr(strrchr($email, "@"), 1);
+        $domain = substr(strrchr($email, '@'), 1);
 
         return static::where(function ($query) use ($email, $domain) {
             $query->where('email', $email)
@@ -137,7 +140,7 @@ class EmailValidation extends Model
 
     public static function markAsValid(string $email): self
     {
-        $domain = substr(strrchr($email, "@"), 1);
+        $domain = substr(strrchr($email, '@'), 1);
 
         return static::updateOrCreate(
             ['email' => $email],
@@ -145,14 +148,14 @@ class EmailValidation extends Model
                 'domain' => $domain,
                 'status' => 'valid',
                 'reason' => 'Email validated successfully',
-                'last_checked_at' => now()
+                'last_checked_at' => now(),
             ]
         );
     }
 
     public static function markAsInvalid(string $email, string $reason, ?string $statusCode = null): self
     {
-        $domain = substr(strrchr($email, "@"), 1);
+        $domain = substr(strrchr($email, '@'), 1);
 
         return static::updateOrCreate(
             ['email' => $email],
@@ -161,14 +164,14 @@ class EmailValidation extends Model
                 'status' => 'invalid',
                 'reason' => $reason,
                 'status_code' => $statusCode,
-                'last_checked_at' => now()
+                'last_checked_at' => now(),
             ]
         );
     }
 
     public static function markAsBlocked(string $email, string $reason, ?string $statusCode = null): self
     {
-        $domain = substr(strrchr($email, "@"), 1);
+        $domain = substr(strrchr($email, '@'), 1);
 
         return static::updateOrCreate(
             ['email' => $email],
@@ -177,15 +180,15 @@ class EmailValidation extends Model
                 'status' => 'blocked',
                 'reason' => $reason,
                 'status_code' => $statusCode,
-                'last_checked_at' => now()
+                'last_checked_at' => now(),
             ]
         );
     }
 
     /**
      * Bulk validatie van mailadressen
-     * 
-     * @param array $emails Array van mailadressen om te controleren
+     *
+     * @param  array  $emails  Array van mailadressen om te controleren
      * @return array Resultaat met telling van valid, invalid/blocked en niet bestaande mailadressen
      */
     public static function bulkValidationStatus(array $emails): array
@@ -195,7 +198,7 @@ class EmailValidation extends Model
             'invalid' => 0,
             'not_exists' => 0,
             'total' => count($emails),
-            'details' => []
+            'details' => [],
         ];
 
         // Haal alle bestaande validaties op in één query
@@ -213,7 +216,7 @@ class EmailValidation extends Model
                     $result['details'][$email] = [
                         'status' => 'valid',
                         'reason' => $validation->reason,
-                        'last_checked_at' => $validation->last_checked_at
+                        'last_checked_at' => $validation->last_checked_at,
                     ];
                 } else {
                     // Status is 'blocked' of 'invalid'
@@ -221,7 +224,7 @@ class EmailValidation extends Model
                     $result['details'][$email] = [
                         'status' => $status,
                         'reason' => $validation->reason,
-                        'last_checked_at' => $validation->last_checked_at
+                        'last_checked_at' => $validation->last_checked_at,
                     ];
                 }
             } else {
@@ -230,7 +233,7 @@ class EmailValidation extends Model
                 $result['details'][$email] = [
                     'status' => 'not_exists',
                     'reason' => 'Mailadres niet gevonden in database',
-                    'last_checked_at' => null
+                    'last_checked_at' => null,
                 ];
             }
         }
@@ -240,9 +243,9 @@ class EmailValidation extends Model
 
     /**
      * Bulk validatie met optie om ontbrekende mailadressen direct te valideren
-     * 
-     * @param array $emails Array van mailadressen om te controleren
-     * @param bool $validateMissing Of ontbrekende mailadressen direct gevalideerd moeten worden
+     *
+     * @param  array  $emails  Array van mailadressen om te controleren
+     * @param  bool  $validateMissing  Of ontbrekende mailadressen direct gevalideerd moeten worden
      * @return array Resultaat met telling van valid, invalid/blocked en niet bestaande mailadressen
      */
     public static function bulkValidationWithCheck(array $emails, bool $validateMissing = false): array
@@ -269,7 +272,7 @@ class EmailValidation extends Model
                     $result['details'][$email] = [
                         'status' => 'valid',
                         'reason' => 'All checks passed',
-                        'last_checked_at' => now()
+                        'last_checked_at' => now(),
                     ];
                 } else {
                     $result['invalid']++;
@@ -278,7 +281,7 @@ class EmailValidation extends Model
                     $result['details'][$email] = [
                         'status' => $validation->status,
                         'reason' => $validation->reason,
-                        'last_checked_at' => $validation->last_checked_at
+                        'last_checked_at' => $validation->last_checked_at,
                     ];
                 }
             }

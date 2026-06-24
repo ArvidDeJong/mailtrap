@@ -17,19 +17,18 @@ class MailLog extends Model
         'source_line',
         'type',
         'model',
-        'model_id'
+        'model_id',
     ];
 
     protected $casts = [
         'model_id' => 'integer',
-        'source_line' => 'integer'
+        'source_line' => 'integer',
     ];
 
     /**
      * Create a MailLog entry with automatic source file and line tracking
      *
-     * @param array $data The MailLog data
-     * @return static
+     * @param  array  $data  The MailLog data
      */
     public static function createWithSource(array $data): static
     {
@@ -39,7 +38,7 @@ class MailLog extends Model
         $sourceFile = $caller['file'] ?? null;
         if ($sourceFile) {
             // Store relative path from base_path
-            $basePath = base_path() . DIRECTORY_SEPARATOR;
+            $basePath = base_path().DIRECTORY_SEPARATOR;
             if (str_starts_with($sourceFile, $basePath)) {
                 $sourceFile = substr($sourceFile, strlen($basePath));
             }
@@ -56,7 +55,7 @@ class MailLog extends Model
                 ($data['status_code'] ?? null) === 550 => 'BLOCKED_',
                 default => 'ERROR_',
             };
-            $data['message_id'] = $prefix . uniqid();
+            $data['message_id'] = $prefix.uniqid();
         }
 
         return static::create($data);
@@ -76,20 +75,20 @@ class MailLog extends Model
     public function scopeFailed($query)
     {
         return $query->where('status_code', '!=', '200')
-                    ->whereNotNull('status_code');
+            ->whereNotNull('status_code');
     }
 
     /**
      * Scope voor emails van een specifiek model
      */
-    public function scopeForModel($query, string $model, int $modelId = null)
+    public function scopeForModel($query, string $model, ?int $modelId = null)
     {
         $query->where('model', $model);
-        
+
         if ($modelId) {
             $query->where('model_id', $modelId);
         }
-        
+
         return $query;
     }
 

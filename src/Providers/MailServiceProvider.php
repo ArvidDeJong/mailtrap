@@ -6,8 +6,8 @@ use Darvis\Mailtrap\Models\EmailValidation;
 use Darvis\Mailtrap\Models\MailLog;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Mail\Events\MessageSent;
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Symfony\Component\Mailer\Exception\TransportException;
 
@@ -22,7 +22,7 @@ class MailServiceProvider extends ServiceProvider
     {
         Event::listen(function (MessageSending $event) {
             $message = $event->message;
-            $addresses = collect($message->getTo())->map(fn($address) => $address->getAddress());
+            $addresses = collect($message->getTo())->map(fn ($address) => $address->getAddress());
 
             // Get headers and sender early for logging
             $headers = $message->getHeaders();
@@ -30,7 +30,7 @@ class MailServiceProvider extends ServiceProvider
 
             foreach ($addresses as $email) {
                 // Validate email if not validated yet
-                if (!EmailValidation::isValid($email)) {
+                if (! EmailValidation::isValid($email)) {
                     EmailValidation::validateEmail($email);
                 }
 
@@ -106,7 +106,7 @@ class MailServiceProvider extends ServiceProvider
             // Update the mail log with success status
             MailLog::where('message_id', $messageId)
                 ->update([
-                    'status_code' => '200' // In Laravel 12, if the message is sent, it's successful
+                    'status_code' => '200', // In Laravel 12, if the message is sent, it's successful
                 ]);
         });
     }

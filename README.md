@@ -1,6 +1,6 @@
 # Darvis Mailtrap Package
 
-A powerful Laravel package for Mailtrap integration with comprehensive email validation functionality.
+A powerful Laravel package for Mailtrap integration: email validation, automatic logging of outgoing mail, a Mailtrap-style inbox UI and a CLI health-check command.
 
 [![Laravel](https://img.shields.io/badge/Laravel-12-red.svg)](https://laravel.com)
 [![PHP](https://img.shields.io/badge/PHP-8.1+-blue.svg)](https://php.net)
@@ -49,6 +49,7 @@ For complete documentation and extensive examples:
 - ✅ **Database Caching** - Fast lookups of previously validated emails
 - ✅ **Automatic Registration** - Laravel package discovery
 - ✅ **Event Listeners** - Automatic validation via Laravel mail events
+- ✅ **Mailer-independent** - Logging & validation work with any transport (Mailtrap, Microsoft Graph, SES, …)
 - ✅ **Rate Limiting** - Built-in API rate limiting
 - ✅ **Webhook Support** - Mailtrap callback support
 
@@ -57,6 +58,13 @@ For complete documentation and extensive examples:
 - ✅ **Detailed Tracking** - Comprehensive validation reporting
 - ✅ **Status Codes** - HTTP-like status codes for categorization
 - ✅ **Configurable** - Extensive configuration options
+
+### 📬 **Inbox UI & Tooling**
+- ✅ **Mailtrap-style Inbox** - Livewire/Flux page to inspect every outgoing email
+- ✅ **Search & Filters** - Filter by status (sent, pending, failed, blocked) and search recipient/sender/subject
+- ✅ **Send Test Mail** - Trigger a test email straight from the inbox
+- ✅ **Delete & Cleanup** - Remove a single log or purge logs older than the retention period
+- ✅ **`mailtrap:test` Command** - CLI health-check with CI-friendly exit codes
 
 ## Author
 
@@ -98,17 +106,26 @@ This creates a `config/manta_mailtrap.php` file with configuration for:
 
 - **API Settings** - Mailtrap API token and base URL
 - **Email Validation** - Validation settings and caching
-- **Mail Logging** - Log settings for outgoing emails
+- **Mail Logging** - Log settings for outgoing emails (incl. `cleanup_after_days` retention)
 - **Webhook** - Webhook configuration and signature verification
 - **Rate Limiting** - API rate limiting settings
+- **Inbox UI** - Route, middleware, layout and page size for the inbox
 
 **Environment Variables:**
 ```env
 MAILTRAP_API_TOKEN=your_api_token_here
 MAILTRAP_VALIDATION_ENABLED=true
 MAILTRAP_LOGGING_ENABLED=true
+MAILTRAP_CLEANUP_AFTER_DAYS=30
 MAILTRAP_WEBHOOK_ENABLED=true
 MAILTRAP_WEBHOOK_SECRET=your_webhook_secret
+
+# Inbox UI
+MAILTRAP_UI_ENABLED=true
+MAILTRAP_UI_ROUTE=mailtrap
+MAILTRAP_UI_MIDDLEWARE=web,auth
+MAILTRAP_UI_LAYOUT=components.layouts.app
+MAILTRAP_UI_PER_PAGE=25
 ```
 
 ## 💡 Usage Examples
@@ -148,6 +165,77 @@ $grouped = collect($result['details'])
 
 **📖 [More examples in the documentation →](./docs/email-validation/examples.md)**
 
+## 📬 Inbox UI
+
+A Mailtrap-style inbox to inspect outgoing mail, built with Livewire and Flux UI.
+
+> **Requirements:** the host application must have `livewire/livewire` and `livewire/flux` installed. When Livewire is absent (or `MAILTRAP_UI_ENABLED=false`) the UI registration is skipped automatically — the rest of the package keeps working.
+
+Once enabled, the inbox lives at the configured route (default `/mailtrap`) and offers:
+
+- A paginated list of all logged mail with status badges (sent, pending, failed, blocked)
+- Search by recipient, sender or subject, and filter by status
+- A detail view per message (message id, status, error, source file/line, linked model)
+- A **Send test mail** action straight from the inbox
+- **Delete** a single log, or **Cleanup** logs older than `logging.cleanup_after_days`
+
+### Configuration
+
+All UI settings are driven by environment variables (see the `ui` section in `config/manta_mailtrap.php`):
+
+```env
+MAILTRAP_UI_ENABLED=true
+MAILTRAP_UI_ROUTE=mailtrap
+MAILTRAP_UI_MIDDLEWARE=web,auth        # comma-separated middleware stack
+MAILTRAP_UI_LAYOUT=components.layouts.app
+MAILTRAP_UI_PER_PAGE=25
+```
+
+> Protect the route with appropriate middleware — the inbox exposes recipients, subjects and error details. For example `MAILTRAP_UI_MIDDLEWARE=web,auth` (or a custom staff/admin middleware).
+
+### Tailwind / Flux
+
+Add the package views to your Tailwind sources so its utility classes are compiled (Tailwind v4 example in `resources/css/app.css`):
+
+```css
+@source '../../vendor/darvis/mailtrap/resources/views/**/*.blade.php';
+```
+
+Optionally publish the views to override them in your application:
+
+```bash
+php artisan vendor:publish --tag=mailtrap-views
+```
+
+## 📮 Mail Transport vs. Mailtrap
+
+This package hooks into Laravel's `MessageSending` / `MessageSent` events, so it works **independently of the mailer (transport) you send through**. Sending via Mailtrap's SMTP, Microsoft Graph, Amazon SES or any other Laravel mailer all flow through the same pipeline — pre-send validation and `MailLog` logging happen for every transport.
+
+The webhook flow is the one exception: delivery, open, click, bounce, spam and reject events are reported **only by Mailtrap**. If you send through another transport (e.g. `microsoft-graph`), local logging and validation still work, but there is no post-delivery feedback to confirm or invalidate addresses.
+
+| Capability | Any mailer | Mailtrap only |
+| --- | :---: | :---: |
+| Pre-send validation (format / MX / blocklist) | ✅ | |
+| Outgoing mail logging (`MessageSending` / `MessageSent`) | ✅ | |
+| Inbox UI & `mailtrap:test` health check | ✅ | |
+| Delivery / open / click confirmation → `markAsValid` | | ✅ (webhook) |
+| Bounce / spam / reject → `markAsInvalid` | | ✅ (webhook) |
+
+> **In practice:** you can route production mail through Microsoft Graph and still get full logging and the inbox UI. To also keep the validation feedback loop — auto-confirming good addresses and flagging bounces — the delivery events must come from Mailtrap.
+
+## 🩺 Health Check Command
+
+Send a test email and report the result. The command returns exit code `0` on success and `1` on failure, which makes it suitable for CI pipelines and uptime monitoring.
+
+```bash
+php artisan mailtrap:test you@example.com
+
+# Use a specific mailer instead of the default
+php artisan mailtrap:test you@example.com --mailer=microsoft-graph
+```
+
+It sends the mail, reads back the corresponding mail log and prints a summary table (message id, sender, recipient, subject, status, error message). A recorded non-success status (e.g. a blocked recipient) is also treated as a failure.
+
 ## 🔗 API Endpoints
 
 ### Webhook
@@ -166,6 +254,7 @@ This package is actively developed with focus on:
 - Comprehensive email validation
 - Automatic blocking of invalid emails
 - Comprehensive mail logging
+- Inbox UI and CLI tooling for inspecting and testing outgoing mail
 
 ## License
 

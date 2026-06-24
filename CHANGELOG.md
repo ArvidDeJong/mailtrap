@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.13] - 2026-06-24
+
+### Added
+
+- **Inbox UI**: a Mailtrap-style Livewire/Flux page to inspect outgoing mail.
+  - Paginated list with status badges (sent, pending, failed, blocked), search by
+    recipient/sender/subject and a status filter
+  - Per-message detail view, a **Send test mail** action, delete a single log and
+    cleanup of logs older than `logging.cleanup_after_days`
+  - New `ui` config section with `MAILTRAP_UI_*` env vars (enabled, route,
+    middleware, layout, per_page)
+  - Views are publishable via `php artisan vendor:publish --tag=mailtrap-views`
+  - Registration is skipped automatically when Livewire is absent or
+    `MAILTRAP_UI_ENABLED=false`, so the rest of the package keeps working
+- **`mailtrap:test` Artisan command**: a CLI health check that sends a test mail,
+  reads back the corresponding mail log and prints a summary. Returns exit code `0`
+  on success and `1` on failure (CI-friendly); `--mailer` selects the transport.
+- **Documentation**: README sections for the Inbox UI, the health-check command,
+  Tailwind/Flux setup, and a "Mail Transport vs. Mailtrap" section explaining that
+  validation and logging are mailer-independent while delivery feedback
+  (delivery/open/click/bounce/spam/reject) is reported only by Mailtrap.
+
+### Changed
+
+- Code-style sweep across the package (Laravel Pint): negation spacing, trailing
+  commas and doc-block formatting. No behavioural changes.
+
 ## [1.0.12] - 2026-05-13
 
 ### Changed

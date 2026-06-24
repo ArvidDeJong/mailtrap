@@ -8,10 +8,8 @@ use Illuminate\Support\Facades\Log;
 
 class MailtrapService
 {
-
-
-
     protected string $apiToken;
+
     protected string $baseUrl = 'https://api.mailtrap.io/api/v1';
 
     public function __construct()
@@ -34,24 +32,26 @@ class MailtrapService
         try {
             $response = Http::withToken($this->apiToken)
                 ->get("{$this->baseUrl}/accounts/validate", [
-                    'email' => $email
+                    'email' => $email,
                 ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 // Only block on server errors (500+), treat client errors (400-499) as invalid
                 if ($response->status() >= 500) {
                     $this->handleFailure($email, 'API validation failed', $response->status());
                 } else {
                     $this->handleInvalid($email, 'API validation failed', $response->status());
                 }
+
                 return false;
             }
 
             $data = $response->json();
 
-            if (!$data['success']) {
+            if (! $data['success']) {
                 // Invalid emails should be marked as invalid, not blocked
                 $this->handleInvalid($email, $data['message'] ?? 'Invalid email', $response->status());
+
                 return false;
             }
 
@@ -62,11 +62,12 @@ class MailtrapService
             return true;
         } catch (\Exception $e) {
             if (config('manta_mailtrap.logging.log_to_laravel', false)) {
-                Log::error('Mailtrap API error: ' . $e->getMessage());
+                Log::error('Mailtrap API error: '.$e->getMessage());
             }
 
             // Unexpected errors should block the email to prevent excessive retries
-            $this->handleFailure($email, 'API error: ' . $e->getMessage());
+            $this->handleFailure($email, 'API error: '.$e->getMessage());
+
             return false;
         }
     }

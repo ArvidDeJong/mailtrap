@@ -97,4 +97,33 @@ return [
         'sandbox_mode' => env('MAILTRAP_SANDBOX_MODE', false),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Inbox UI
+    |--------------------------------------------------------------------------
+    |
+    | Configuratie voor de Mailtrap-achtige inbox: een Livewire/Flux pagina
+    | waarmee je uitgaande mail kunt inspecteren en een testmail kunt sturen.
+    | De UI vereist livewire/livewire en livewire/flux in de host-applicatie.
+    |
+    */
+
+    'ui' => [
+        'enabled' => env('MAILTRAP_UI_ENABLED', true),
+
+        // Pad waarop de inbox bereikbaar is, bijv. https://app.test/mailtrap
+        'route' => env('MAILTRAP_UI_ROUTE', 'mailtrap'),
+
+        // Komma-gescheiden lijst van middleware, bijv. "web,auth" of "web,staff".
+        'middleware' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('MAILTRAP_UI_MIDDLEWARE', 'web'))
+        ))),
+
+        // Blade-layout waarin de full-page component wordt gerenderd.
+        'layout' => env('MAILTRAP_UI_LAYOUT', 'components.layouts.app'),
+
+        'per_page' => (int) env('MAILTRAP_UI_PER_PAGE', 25),
+    ],
+
 ];
