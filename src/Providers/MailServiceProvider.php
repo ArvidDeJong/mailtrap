@@ -28,6 +28,24 @@ class MailServiceProvider extends ServiceProvider
             $headers = $message->getHeaders();
             $sender = collect($message->getFrom())->first()->getAddress();
 
+            // Use ONE message id for the whole message, shared by every recipient.
+            // A message sent to multiple recipients fires a single MessageSent event,
+            // so all recipient log rows must carry the same id to be marked as sent.
+            // (Generating a fresh id per recipient left the header holding only the
+            // last recipient's id, so earlier recipients stayed stuck on "pending".)
+            $messageId = $headers->has('X-Message-ID')
+                ? $headers->get('X-Message-ID')->getBodyAsString()
+                : Str::uuid()->toString();
+
+            if ($headers->has('X-Message-ID')) {
+                $headers->remove('X-Message-ID');
+            }
+            $headers->addTextHeader('X-Message-ID', $messageId);
+
+            $type = $headers->has('X-Mail-Type') ? $headers->get('X-Mail-Type')->getBodyAsString() : null;
+            $model = $headers->has('X-Mail-Model') ? $headers->get('X-Mail-Model')->getBodyAsString() : null;
+            $modelId = $headers->has('X-Mail-Model-ID') ? (int) $headers->get('X-Mail-Model-ID')->getBodyAsString() : null;
+
             foreach ($addresses as $email) {
                 // Validate email if not validated yet
                 if (! EmailValidation::isValid($email)) {
@@ -36,11 +54,6 @@ class MailServiceProvider extends ServiceProvider
 
                 // Check if email is blocked after validation
                 if (EmailValidation::isBlocked($email)) {
-                    // Generate message ID if not exists for logging
-                    $messageId = $headers->has('X-Message-ID')
-                        ? $headers->get('X-Message-ID')->getBodyAsString()
-                        : Str::uuid()->toString();
-
                     $blockReason = EmailValidation::getBlockReason($email) ?? 'Email address is blocked';
 
                     MailLog::createWithSource([
@@ -50,49 +63,29 @@ class MailServiceProvider extends ServiceProvider
                         'subject' => $message->getSubject(),
                         'status_code' => 550,
                         'error_message' => $blockReason,
-                        'type' => $headers->has('X-Mail-Type') ? $headers->get('X-Mail-Type')->getBodyAsString() : null,
-                        'model' => $headers->has('X-Mail-Model') ? $headers->get('X-Mail-Model')->getBodyAsString() : null,
-                        'model_id' => $headers->has('X-Mail-Model-ID') ? (int) $headers->get('X-Mail-Model-ID')->getBodyAsString() : null,
+                        'type' => $type,
+                        'model' => $model,
+                        'model_id' => $modelId,
                     ]);
                     throw new TransportException("Email address {$email} is blocked: {$blockReason}");
                 }
 
-                // Always generate a new unique message ID for each sending attempt
-                $messageId = Str::uuid()->toString();
-                if ($headers->has('X-Message-ID')) {
-                    $headers->remove('X-Message-ID');
-                }
-                $headers->addTextHeader('X-Message-ID', $messageId);
-
                 try {
                     MailLog::create([
-                        'message_id' => $headers->get('X-Message-ID')->getBodyAsString(),
+                        'message_id' => $messageId,
                         'sender' => $sender,
                         'recipient' => $email,
                         'subject' => $message->getSubject(),
                         'status_code' => null, // Will be updated when message is sent
-                        'type' => $headers->has('X-Mail-Type') ? $headers->get('X-Mail-Type')->getBodyAsString() : null,
-                        'model' => $headers->has('X-Mail-Model') ? $headers->get('X-Mail-Model')->getBodyAsString() : null,
-                        'model_id' => $headers->has('X-Mail-Model-ID') ? (int) $headers->get('X-Mail-Model-ID')->getBodyAsString() : null,
+                        'type' => $type,
+                        'model' => $model,
+                        'model_id' => $modelId,
                     ]);
                 } catch (\Exception $e) {
-                    // If duplicate message_id, generate a new one and try again
-                    if (str_contains($e->getMessage(), 'Duplicate entry') && str_contains($e->getMessage(), 'message_id')) {
-                        $messageId = Str::uuid()->toString();
-                        $message->getHeaders()->remove('X-Message-ID');
-                        $message->getHeaders()->addTextHeader('X-Message-ID', $messageId);
-
-                        MailLog::create([
-                            'message_id' => $messageId,
-                            'sender' => $sender,
-                            'recipient' => $email,
-                            'subject' => $message->getSubject(),
-                            'status_code' => null,
-                            'type' => $headers->has('X-Mail-Type') ? $headers->get('X-Mail-Type')->getBodyAsString() : null,
-                            'model' => $headers->has('X-Mail-Model') ? $headers->get('X-Mail-Model')->getBodyAsString() : null,
-                            'model_id' => $headers->has('X-Mail-Model-ID') ? (int) $headers->get('X-Mail-Model-ID')->getBodyAsString() : null,
-                        ]);
-                    } else {
+                    // A lingering legacy unique index on message_id can reject the
+                    // shared id for a second recipient. Skip the duplicate rather than
+                    // regenerating the id, which would desync this row from MessageSent.
+                    if (! (str_contains($e->getMessage(), 'Duplicate entry') && str_contains($e->getMessage(), 'message_id'))) {
                         throw $e;
                     }
                 }
@@ -101,10 +94,16 @@ class MailServiceProvider extends ServiceProvider
 
         Event::listen(function (MessageSent $event) {
             $message = $event->message;
+
+            if (! $message->getHeaders()->has('X-Message-ID')) {
+                return;
+            }
+
             $messageId = $message->getHeaders()->get('X-Message-ID')->getBodyAsString();
 
-            // Update the mail log with success status
+            // Mark every recipient of this message as sent in a single update.
             MailLog::where('message_id', $messageId)
+                ->whereNull('status_code')
                 ->update([
                     'status_code' => '200', // In Laravel 12, if the message is sent, it's successful
                 ]);
