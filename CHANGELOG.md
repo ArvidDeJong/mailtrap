@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.15] - 2026-09-09
+
+### Fixed
+
+- **Migrations now run on every database driver**: the
+  `make_message_id_nullable_in_mail_logs_table` migration probed for indexes with
+  raw `SHOW INDEX FROM mail_logs`, which is MySQL-only syntax. Installing the
+  package in an application that runs its test suite on SQLite — the Laravel
+  default — made every migration fail with
+  `SQLSTATE[HY000]: General error: 1 near "SHOW"`, taking the host
+  application's whole suite down with it. Index detection now goes through
+  `Schema::getIndexes()`, which works on all drivers Laravel supports.
+
+### Changed
+
+- **Dev dependencies widened** to `orchestra/testbench ^9.0|^10.0|^11.0` and
+  `phpunit/phpunit ^11.0|^12.0|^13.0`. The old constraints only resolved against
+  Laravel 10, so the package's own test suite could not be installed at all on
+  the Laravel 11–13 versions the package supports. This affects contributors
+  only, not applications.
+- The test suite now runs migration `000003` as well; it was silently skipped
+  before, which is why the broken `SHOW INDEX` was never caught.
+
 ## [1.0.14] - 2026-06-25
 
 ### Fixed

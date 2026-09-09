@@ -1,49 +1,49 @@
 {
-  "name": "darvis/mailtrap",
-  "description": "A Laravel package for Mailtrap integration",
-  "type": "library",
-  "license": "MIT",
-  "authors": [
-    {
-      "name": "Arvid de Jong",
-      "email": "info@arvid.nl"
+    "name": "darvis/mailtrap",
+    "description": "A Laravel package for Mailtrap integration",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Arvid de Jong",
+            "email": "info@arvid.nl"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "laravel/framework": "^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0",
+        "phpunit/phpunit": "^11.0|^12.0|^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Darvis\\Mailtrap\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Darvis\\Mailtrap\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Darvis\\Mailtrap\\MailtrapServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "pest tests"
     }
-  ],
-  "require": {
-    "php": "^8.1",
-    "laravel/framework": "^11.0|^12.0|^13.0"
-  },
-  "require-dev": {
-    "orchestra/testbench": "^8.0|^9.0",
-    "pestphp/pest": "^3.0|^4.0",
-    "pestphp/pest-plugin-laravel": "^3.0|^4.0",
-    "phpunit/phpunit": "^11.0"
-  },
-  "autoload": {
-    "psr-4": {
-      "Darvis\\Mailtrap\\": "src/"
-    }
-  },
-  "autoload-dev": {
-    "psr-4": {
-      "Darvis\\Mailtrap\\Tests\\": "tests/"
-    }
-  },
-  "extra": {
-    "laravel": {
-      "providers": [
-        "Darvis\\Mailtrap\\MailtrapServiceProvider"
-      ]
-    }
-  },
-  "minimum-stability": "stable",
-  "prefer-stable": true,
-  "config": {
-    "allow-plugins": {
-      "pestphp/pest-plugin": true
-    }
-  },
-  "scripts": {
-    "test": "pest tests"
-  }
 }

@@ -37,6 +37,7 @@ abstract class TestCase extends BaseTestCase
             '/database/migrations/2024_01_01_000000_create_email_validations_table.php',
             '/database/migrations/2024_01_01_000001_create_mail_logs_table.php',
             '/database/migrations/2024_01_01_000002_add_error_tracking_to_mail_logs_table.php',
+            '/database/migrations/2024_01_01_000003_make_message_id_nullable_in_mail_logs_table.php',
         ];
 
         foreach ($migrations as $migration) {
