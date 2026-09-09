@@ -20,7 +20,7 @@ vendor/bin/pest tests/MailtrapWebhookControllerTest.php   # Run one test file
 vendor/bin/pest --filter "creates mail log"               # Run a single test by name
 ```
 
-Tests use Orchestra Testbench with an in-memory SQLite database; migrations are loaded manually in [TestCase::runPackageMigrations()](tests/TestCase.php) (not via `loadMigrationsFrom`), so **when adding a new migration, also add it to that array** or Pest tests against it will fail with "no such table".
+Tests use Orchestra Testbench with an in-memory SQLite database; migrations are loaded manually in [TestCase::runPackageMigrations()](tests/TestCase.php) (not via `loadMigrationsFrom`), so **when adding a new migration, also add it to that array** or Pest tests against it will fail with "no such table" — and, worse, the migration itself goes untested (this is how the MySQL-only `SHOW INDEX` in `000003` survived until 1.0.15).
 
 ## Architecture
 
@@ -69,11 +69,11 @@ Captures `debug_backtrace` to record `source_file` and `source_line` of the call
 
 ### Migrations
 
-`message_id` on `mail_logs` was originally `unique`. Migration `2024_01_01_000003` drops that constraint (so blocked/error logs can share generated IDs and unsent attempts don't collide) and replaces it with a plain index. It uses raw `SHOW INDEX` queries rather than Doctrine DBAL — required for Laravel 11+ compatibility (see [CHANGELOG.md](CHANGELOG.md) 1.0.8/1.0.9). Follow the same pattern for any future schema-altering migrations on existing columns.
+`message_id` on `mail_logs` was originally `unique`. Migration `2024_01_01_000003` drops that constraint (so blocked/error logs can share generated IDs and unsent attempts don't collide) and replaces it with a plain index. It detects existing indexes with `Schema::getIndexes('mail_logs')`, which is native to Laravel 11+ and works on every driver. It used raw `SHOW INDEX` until 1.0.15; that is MySQL-only syntax and broke every migration in host apps testing on SQLite. Follow the `Schema::` route for any future schema-altering migration — it satisfies the no-DBAL constraint without tying the package to one database.
 
 ## Conventions specific to this package
 
 - Config file stays as `config/manta_mailtrap.php` with that exact name (do not rename to `mailtrap.php`).
 - Existing inline comments and log messages are in Dutch; new code in the same files should match. README and CHANGELOG are English.
-- Don't introduce Doctrine DBAL — Laravel 11+ compatibility depends on its absence (use raw `SHOW INDEX` / `Schema::hasColumn` style checks for schema changes).
+- Don't introduce Doctrine DBAL — Laravel 11+ compatibility depends on its absence. Use the native schema builder (`Schema::hasColumn`, `Schema::hasTable`, `Schema::getIndexes`) for schema checks. Never reach for driver-specific SQL such as `SHOW INDEX`: host apps run their tests on SQLite, where it is a syntax error.
 - The webhook controller extends `Illuminate\Routing\Controller` (not an app-level base controller) so the package works without the host app's `App\Http\Controllers\Controller`.
