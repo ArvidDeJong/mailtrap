@@ -2,8 +2,9 @@
 
 namespace Darvis\Mailtrap\Tests;
 
-use Orchestra\Testbench\TestCase as BaseTestCase;
 use Darvis\Mailtrap\MailtrapServiceProvider;
+use Illuminate\Testing\TestResponse;
+use Orchestra\Testbench\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -14,6 +15,11 @@ abstract class TestCase extends BaseTestCase
         ];
     }
 
+    /**
+     * Signing secret used by the webhook tests.
+     */
+    protected const WEBHOOK_SECRET = '0123456789abcdef0123456789abcdef';
+
     protected function getEnvironmentSetUp($app): void
     {
         $app['config']->set('database.default', 'testing');
@@ -22,6 +28,29 @@ abstract class TestCase extends BaseTestCase
             'database' => ':memory:',
             'prefix' => '',
         ]);
+
+        $app['config']->set('manta_mailtrap.webhook.secret', self::WEBHOOK_SECRET);
+    }
+
+    /**
+     * POST a webhook payload carrying a valid Mailtrap signature.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function postSignedWebhook(array $payload, ?string $secret = null): TestResponse
+    {
+        $body = json_encode($payload);
+
+        return $this->call(
+            'POST',
+            '/api/webhooks/mailtrap',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_ACCEPT' => 'application/json',
+                'HTTP_MAILTRAP_SIGNATURE' => hash_hmac('sha256', $body, $secret ?? self::WEBHOOK_SECRET),
+            ],
+            content: $body,
+        );
     }
 
     protected function setUp(): void
@@ -41,7 +70,7 @@ abstract class TestCase extends BaseTestCase
         ];
 
         foreach ($migrations as $migration) {
-            $migrationInstance = require __DIR__ . '/..' . $migration;
+            $migrationInstance = require __DIR__.'/..'.$migration;
             $migrationInstance->up();
         }
     }

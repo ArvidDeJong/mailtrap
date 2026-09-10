@@ -46,37 +46,57 @@ class MailServiceProvider extends ServiceProvider
             $model = $headers->has('X-Mail-Model') ? $headers->get('X-Mail-Model')->getBodyAsString() : null;
             $modelId = $headers->has('X-Mail-Model-ID') ? (int) $headers->get('X-Mail-Model-ID')->getBodyAsString() : null;
 
+            $validationEnabled = (bool) config('manta_mailtrap.validation.enabled', true);
+            $blockInvalid = (bool) config('manta_mailtrap.validation.block_invalid', true);
+            $loggingEnabled = (bool) config('manta_mailtrap.logging.enabled', true);
+            $logSuccessful = $loggingEnabled && config('manta_mailtrap.logging.log_successful', true);
+            $logFailed = $loggingEnabled && config('manta_mailtrap.logging.log_failed', true);
+
             foreach ($addresses as $email) {
-                // Validate email if not validated yet
-                if (! EmailValidation::isValid($email)) {
+                // Validate email if not validated yet. Disabling validation skips the
+                // MX lookups, which are performed synchronously during the send.
+                if ($validationEnabled && ! EmailValidation::isValid($email)) {
                     EmailValidation::validateEmail($email);
                 }
 
                 // Check if email is blocked after validation
-                if (EmailValidation::isBlocked($email)) {
-                    $blockReason = EmailValidation::getBlockReason($email) ?? 'Email address is blocked';
+                $blockReason = EmailValidation::isBlocked($email)
+                    ? (EmailValidation::getBlockReason($email) ?? 'Email address is blocked')
+                    : null;
 
-                    MailLog::createWithSource([
-                        'message_id' => $messageId,
-                        'sender' => $sender,
-                        'recipient' => $email,
-                        'subject' => $message->getSubject(),
-                        'status_code' => 550,
-                        'error_message' => $blockReason,
-                        'type' => $type,
-                        'model' => $model,
-                        'model_id' => $modelId,
-                    ]);
+                if ($blockReason !== null && $blockInvalid) {
+                    if ($logFailed) {
+                        MailLog::createWithSource([
+                            'message_id' => $messageId,
+                            'sender' => $sender,
+                            'recipient' => $email,
+                            'subject' => $message->getSubject(),
+                            'status_code' => 550,
+                            'error_message' => $blockReason,
+                            'type' => $type,
+                            'model' => $model,
+                            'model_id' => $modelId,
+                        ]);
+                    }
+
                     throw new TransportException("Email address {$email} is blocked: {$blockReason}");
                 }
 
+                if (! $logSuccessful) {
+                    continue;
+                }
+
                 try {
+                    // With hard blocking switched off a flagged address is still
+                    // delivered, so log it as a normal send and keep the reason
+                    // on the row rather than filing it as a failure.
                     MailLog::create([
                         'message_id' => $messageId,
                         'sender' => $sender,
                         'recipient' => $email,
                         'subject' => $message->getSubject(),
                         'status_code' => null, // Will be updated when message is sent
+                        'error_message' => $blockReason,
                         'type' => $type,
                         'model' => $model,
                         'model_id' => $modelId,
@@ -93,6 +113,10 @@ class MailServiceProvider extends ServiceProvider
         });
 
         Event::listen(function (MessageSent $event) {
+            if (! config('manta_mailtrap.logging.enabled', true)) {
+                return;
+            }
+
             $message = $event->message;
 
             if (! $message->getHeaders()->has('X-Message-ID')) {

@@ -28,9 +28,22 @@ return [
     */
 
     'validation' => [
+        // Schakel uit om de MX-lookups over te slaan. Die worden synchroon
+        // tijdens het versturen uitgevoerd, dus trage DNS vertraagt de request.
         'enabled' => env('MAILTRAP_VALIDATION_ENABLED', true),
+
+        // Hoe lang een lokaal vastgesteld 'blocked'-resultaat blijft gelden.
+        // Daarna wordt het adres opnieuw gecontroleerd, zodat een tijdelijke
+        // DNS-storing een adres niet voorgoed blokkeert. Zet op 0 om nooit te
+        // verlopen. Statussen uit Mailtrap-events ('valid'/'invalid') worden
+        // nooit lokaal opnieuw afgeleid.
         'cache_duration' => env('MAILTRAP_VALIDATION_CACHE_DURATION', 3600), // seconds
+
         'retry_attempts' => env('MAILTRAP_VALIDATION_RETRY_ATTEMPTS', 3),
+
+        // Wanneer true wordt het versturen naar een geblokkeerd adres afgebroken
+        // met een TransportException. Wanneer false gaat de mail gewoon uit en
+        // blijft de reden alleen als error_message op de log staan.
         'block_invalid' => env('MAILTRAP_BLOCK_INVALID_EMAILS', true),
     ],
 
@@ -63,8 +76,15 @@ return [
     */
 
     'webhook' => [
+        // Wanneer false wordt de route /api/webhooks/mailtrap niet geregistreerd.
         'enabled' => env('MAILTRAP_WEBHOOK_ENABLED', true),
+
+        // De 32-tekens hex signing secret uit het webhook-detailpaneel in Mailtrap.
         'secret' => env('MAILTRAP_WEBHOOK_SECRET'),
+
+        // Controleert de HMAC-SHA256 in de Mailtrap-Signature header. Faalt
+        // dicht: zonder secret worden alle calls met 403 geweigerd. Zet op false
+        // om ongetekende calls te accepteren.
         'verify_signature' => env('MAILTRAP_WEBHOOK_VERIFY_SIGNATURE', true),
     ],
 

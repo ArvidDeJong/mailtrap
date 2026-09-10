@@ -51,7 +51,7 @@ Implication: **blocking is by-domain, not just by-email** (see `EmailValidation:
 
 For every handled event, `upsertMailLogFromWebhook()` either updates the existing `MailLog` row by `message_id` or creates a new one (the local `MessageSending` path may not have run, e.g. when Mailtrap is the only source of truth). The endpoint always returns 200 to keep Mailtrap from retrying — failures are swallowed and counted as `skipped`.
 
-Webhook signature verification is configured (`webhook.verify_signature`, `webhook.secret` in config) but **not yet enforced** in the controller. If you add it, do so as middleware on the route, not inline.
+Webhook signature verification runs in [VerifyMailtrapWebhookSignature](src/Http/Middleware/VerifyMailtrapWebhookSignature.php), attached as route middleware in the service provider — not inline in the controller. It checks the HMAC-SHA256 of the **raw** request body against the `Mailtrap-Signature` header and **fails closed**: with `webhook.verify_signature` on and no `webhook.secret`, every call is rejected with 403. Never re-encode the body before hashing; Mailtrap signs the bytes as sent. The route itself is only registered when `webhook.enabled` is true.
 
 ### Validation states
 
@@ -74,6 +74,6 @@ Captures `debug_backtrace` to record `source_file` and `source_line` of the call
 ## Conventions specific to this package
 
 - Config file stays as `config/manta_mailtrap.php` with that exact name (do not rename to `mailtrap.php`).
-- Existing inline comments and log messages are in Dutch; new code in the same files should match. README and CHANGELOG are English.
+- Inline comments and log messages in the older files are in Dutch; newer code is English. README and CHANGELOG are English. Prefer English for new code.
 - Don't introduce Doctrine DBAL — Laravel 11+ compatibility depends on its absence. Use the native schema builder (`Schema::hasColumn`, `Schema::hasTable`, `Schema::getIndexes`) for schema checks. Never reach for driver-specific SQL such as `SHOW INDEX`: host apps run their tests on SQLite, where it is a syntax error.
 - The webhook controller extends `Illuminate\Routing\Controller` (not an app-level base controller) so the package works without the host app's `App\Http\Controllers\Controller`.

@@ -3,6 +3,7 @@
 namespace Darvis\Mailtrap;
 
 use Darvis\Mailtrap\Console\Commands\MailtrapTestCommand;
+use Darvis\Mailtrap\Http\Middleware\VerifyMailtrapWebhookSignature;
 use Darvis\Mailtrap\Livewire\MailtrapInbox;
 use Darvis\Mailtrap\Providers\MailServiceProvider;
 use Darvis\Mailtrap\Services\MailtrapService;
@@ -17,6 +18,13 @@ class MailtrapServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Merge the config before anything in boot() reads it; route and UI
+        // registration both depend on these values being present.
+        $this->mergeConfigFrom(
+            __DIR__.'/../config/manta_mailtrap.php',
+            'manta_mailtrap'
+        );
+
         // Registreer de MailServiceProvider
         $this->app->register(MailServiceProvider::class);
 
@@ -34,10 +42,7 @@ class MailtrapServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Load API routes with proper API prefix and middleware
-        Route::prefix('api')
-            ->middleware('api')
-            ->group(__DIR__.'/../routes/api.php');
+        $this->registerWebhookRoute();
 
         // Publiceer migrations
         $this->publishes([
@@ -59,12 +64,6 @@ class MailtrapServiceProvider extends ServiceProvider
             __DIR__.'/../config/manta_mailtrap.php' => config_path('manta_mailtrap.php'),
         ], 'mailtrap-config');
 
-        // Merge config met applicatie config
-        $this->mergeConfigFrom(
-            __DIR__.'/../config/manta_mailtrap.php',
-            'manta_mailtrap'
-        );
-
         // Laad de package views onder de "mailtrap" namespace.
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'mailtrap');
 
@@ -73,6 +72,24 @@ class MailtrapServiceProvider extends ServiceProvider
         ], 'mailtrap-views');
 
         $this->registerInboxUi();
+    }
+
+    /**
+     * Register the Mailtrap webhook endpoint.
+     *
+     * The route is only registered when the webhook is enabled, so an app that
+     * does not receive Mailtrap events exposes no endpoint at all. Signature
+     * verification runs as route middleware rather than inside the controller.
+     */
+    protected function registerWebhookRoute(): void
+    {
+        if (! config('manta_mailtrap.webhook.enabled', true)) {
+            return;
+        }
+
+        Route::prefix('api')
+            ->middleware(['api', VerifyMailtrapWebhookSignature::class])
+            ->group(__DIR__.'/../routes/api.php');
     }
 
     /**

@@ -26,14 +26,12 @@ class EmailValidation extends Model
         // Controleer eerst of er al een record bestaat
         $existingValidation = static::where('email', $email)->first();
 
-        if ($existingValidation) {
-            // Als het record bestaat en niet valid is, return de foutmelding
-            if ($existingValidation->status !== 'valid') {
-                return $existingValidation->reason;
-            }
-
-            // Als het record bestaat en valid is, return null (geen fout)
-            return null;
+        if ($existingValidation && ! static::isStale($existingValidation)) {
+            // Een bestaand, nog geldig resultaat: valid geeft null, alles
+            // daarbuiten de eerder vastgelegde foutmelding.
+            return $existingValidation->status === 'valid'
+                ? null
+                : $existingValidation->reason;
         }
 
         // Geen bestaand record gevonden, voer volledige validatie uit
@@ -83,6 +81,33 @@ class EmailValidation extends Model
         static::saveValidation($email, 'valid', 'All checks passed', 200);
 
         return null;
+    }
+
+    /**
+     * Bepaal of een eerder vastgelegd resultaat opnieuw gecontroleerd moet worden.
+     *
+     * Alleen lokaal afgeleide 'blocked'-records verlopen. Een DNS-storing of een
+     * tijdelijk ontbrekend MX-record zou een adres anders voorgoed blokkeren.
+     * 'valid' en 'invalid' komen uit Mailtrap-events en zijn niet met een MX
+     * lookup te reproduceren, dus die blijven staan.
+     */
+    protected static function isStale(self $validation): bool
+    {
+        if ($validation->status !== 'blocked') {
+            return false;
+        }
+
+        $cacheDuration = (int) config('manta_mailtrap.validation.cache_duration', 3600);
+
+        if ($cacheDuration <= 0) {
+            return false;
+        }
+
+        if ($validation->last_checked_at === null) {
+            return true;
+        }
+
+        return $validation->last_checked_at->addSeconds($cacheDuration)->isPast();
     }
 
     public static function saveValidation($email, $status, $reason, $status_code)

@@ -18,7 +18,7 @@ it('creates mail log when message id does not exist', function (): void {
         ],
     ];
 
-    $response = $this->postJson('/api/webhooks/mailtrap', $payload);
+    $response = $this->postSignedWebhook($payload);
 
     $response->assertOk();
 
@@ -60,7 +60,7 @@ it('updates existing mail log without creating duplicate', function (): void {
         ],
     ];
 
-    $response = $this->postJson('/api/webhooks/mailtrap', $payload);
+    $response = $this->postSignedWebhook($payload);
 
     $response->assertOk();
 

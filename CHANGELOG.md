@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-10
+
+### Security
+
+- **Webhook signature verification is now enforced.** `POST /api/webhooks/mailtrap`
+  accepted any request: `webhook.verify_signature` and `webhook.secret` were
+  configured but never read, so anyone who knew the URL could post `bounce` events
+  and have arbitrary addresses marked invalid — blocking real mail. Requests are now
+  checked against the HMAC-SHA256 in Mailtrap's `Mailtrap-Signature` header by a
+  `VerifyMailtrapWebhookSignature` middleware on the route.
+
+### Fixed
+
+- **Config is merged in `register()`** instead of halfway through `boot()`, so
+  settings are available to everything that boots afterwards. Webhook route
+  registration previously read config that had not been merged yet.
+
+### Changed
+
+- **`webhook.enabled` is honoured**: when false, the webhook route is no longer
+  registered at all instead of being registered and left reachable.
+- **`validation.enabled` is honoured**: when false, the MX lookups that run
+  synchronously during every send are skipped entirely.
+- **`validation.block_invalid` is honoured**: when false, a flagged address is
+  delivered to instead of aborting the send, and is logged as a normal send with the
+  reason kept in `error_message` rather than filed as a 550 failure.
+- **`validation.cache_duration` is honoured** for locally derived `blocked` records,
+  which are re-checked once it has passed. A transient DNS failure used to block an
+  address permanently. Statuses that come from Mailtrap events (`valid`, `invalid`)
+  are never re-derived from an MX lookup, since a lookup cannot reproduce a bounce.
+- **`logging.enabled`, `logging.log_successful` and `logging.log_failed` are
+  honoured**; all three were previously ignored and every send was logged.
+
+### Upgrading
+
+`MAILTRAP_WEBHOOK_SECRET` is now required for the webhook to accept anything. Copy
+the 32-character hex secret from the webhook detail panel in Mailtrap. If you do not
+use Mailtrap webhooks, set `MAILTRAP_WEBHOOK_ENABLED=false`. To keep accepting
+unsigned calls, set `MAILTRAP_WEBHOOK_VERIFY_SIGNATURE=false` — but note the endpoint
+writes to `email_validations` and `mail_logs`.
+
+Apps that relied on the ignored config flags will see behaviour change to match what
+those flags say. Check `MAILTRAP_VALIDATION_ENABLED`, `MAILTRAP_BLOCK_INVALID_EMAILS`
+and the `MAILTRAP_LOG_*` values before upgrading.
+
 ## [1.0.15] - 2026-09-09
 
 ### Fixed

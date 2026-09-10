@@ -39,7 +39,8 @@ For complete documentation and extensive examples:
 
 ### 🎯 **Email Validation**
 - ✅ **Format Validation** - Checks basic email format
-- ✅ **MX Record Verification** - Verifies domain mail servers
+- ✅ **MX Record Verification** - Verifies domain mail servers (runs synchronously
+  during the send; disable with `MAILTRAP_VALIDATION_ENABLED=false`)
 - ✅ **IP Validation** - Checks if MX records point to valid IPs
 - ✅ **Bulk Validation** - Efficient validation of multiple email addresses
 - ✅ **Laravel Collections** - Powerful filtering and data manipulation
@@ -115,10 +116,15 @@ This creates a `config/manta_mailtrap.php` file with configuration for:
 ```env
 MAILTRAP_API_TOKEN=your_api_token_here
 MAILTRAP_VALIDATION_ENABLED=true
+MAILTRAP_BLOCK_INVALID_EMAILS=true
+MAILTRAP_VALIDATION_CACHE_DURATION=3600
 MAILTRAP_LOGGING_ENABLED=true
+MAILTRAP_LOG_SUCCESSFUL=true
+MAILTRAP_LOG_FAILED=true
 MAILTRAP_CLEANUP_AFTER_DAYS=30
 MAILTRAP_WEBHOOK_ENABLED=true
 MAILTRAP_WEBHOOK_SECRET=your_webhook_secret
+MAILTRAP_WEBHOOK_VERIFY_SIGNATURE=true
 
 # Inbox UI
 MAILTRAP_UI_ENABLED=true
@@ -240,12 +246,33 @@ It sends the mail, reads back the corresponding mail log and prints a summary ta
 
 ### Webhook
 
-The package automatically includes a webhook endpoint:
+The package registers a webhook endpoint:
 
 - **Endpoint**: `POST /api/webhooks/mailtrap`
 - **Route name**: `webhooks.mailtrap`
 
-The webhook is automatically registered and accepts external calls from Mailtrap.
+Set `MAILTRAP_WEBHOOK_ENABLED=false` to not register the route at all — recommended
+when you send through another transport, since delivery events only come from Mailtrap.
+
+#### Signature verification
+
+Mailtrap signs every webhook with an HMAC-SHA256 of the raw request body, hex encoded,
+in the `Mailtrap-Signature` header. The package verifies it and **fails closed**: with
+`verify_signature` enabled and no secret configured, every call is rejected with `403`.
+
+```env
+MAILTRAP_WEBHOOK_SECRET=your_32_char_hex_signing_secret
+```
+
+Copy the secret from the webhook detail panel in Mailtrap. To accept unsigned calls
+anyway — not recommended, the endpoint writes to `email_validations` and `mail_logs`:
+
+```env
+MAILTRAP_WEBHOOK_VERIFY_SIGNATURE=false
+```
+
+> **Why this matters:** a `bounce` event marks an address invalid. Left unverified,
+> anyone who knows the URL can post events for arbitrary addresses.
 
 ## 🛠️ Development
 
