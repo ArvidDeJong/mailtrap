@@ -5,6 +5,7 @@ namespace Darvis\Mailtrap\Console\Commands;
 use Darvis\Mailtrap\Console\Commands\Concerns\WritesEnvironment;
 use Darvis\Mailtrap\Services\MailtrapWebhookApi;
 use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
@@ -74,6 +75,7 @@ class MailtrapInstallCommand extends Command
     private function installWithoutQuestions(): int
     {
         $this->showCurrentState();
+        $this->reportMissingConfigKeys();
 
         $this->publishConfig();
 
@@ -175,6 +177,7 @@ class MailtrapInstallCommand extends Command
         $this->components->twoColumnDetail('Database', $this->databaseReachable ? '<fg=green>connected</>' : '<fg=red>cannot connect</>');
         $this->components->twoColumnDetail('Current mailer', (string) config('mail.default'));
         $this->components->twoColumnDetail('Livewire (for the inbox page)', $this->inboxAvailable() ? 'installed' : 'not installed');
+        $this->components->twoColumnDetail('config/manta_mailtrap.php', file_exists(config_path('manta_mailtrap.php')) ? 'published' : 'package defaults');
 
         if (! $this->databaseReachable) {
             $this->components->warn('The database is not reachable: '.($databaseError ?? 'unknown error').'. Check the DB_* values in .env. The wizard continues, but skips the steps that need the database.');
@@ -183,6 +186,8 @@ class MailtrapInstallCommand extends Command
         if ($appUrl === '' || $this->isLocalUrl($appUrl)) {
             $this->components->warn('APP_URL points at this computer. That is fine for development, but Mailtrap cannot send webhook events here. Step 5 explains what to do.');
         }
+
+        $this->reportMissingConfigKeys();
 
         $this->result('Basics', 'ok', $this->databaseReachable ? 'environment checked' : 'database not reachable');
 
@@ -785,6 +790,55 @@ class MailtrapInstallCommand extends Command
     private function result(string $step, string $status, string $detail): void
     {
         $this->results[] = [$step, $status, $detail];
+    }
+
+    /**
+     * The published config is never overwritten: it holds the app's own route,
+     * middleware and layout. A published section replaces the package section
+     * as a whole, so name the keys a newer package version added instead. The
+     * code falls back to defaults for them, so this is a notice, not an error.
+     */
+    private function reportMissingConfigKeys(): void
+    {
+        $published = config_path('manta_mailtrap.php');
+
+        if (! file_exists($published)) {
+            return;
+        }
+
+        $missing = array_values(array_diff(
+            $this->configKeys(__DIR__.'/../../../config/manta_mailtrap.php'),
+            $this->configKeys($published),
+        ));
+
+        if ($missing === []) {
+            return;
+        }
+
+        $this->components->warn('config/manta_mailtrap.php was published from an older version and lacks these keys. The package uses their defaults; copy them from vendor/darvis/mailtrap/config/manta_mailtrap.php to change them:');
+        $this->components->bulletList($missing);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function configKeys(string $path): array
+    {
+        try {
+            $config = require $path;
+        } catch (Throwable) {
+            return [];
+        }
+
+        if (! is_array($config)) {
+            return [];
+        }
+
+        // List values such as ui.middleware.0 count as their parent key.
+        return array_values(array_unique(array_map(
+            fn (string $key): string => (string) preg_replace('/\.\d+(\..*)?$/', '', $key),
+            array_keys(Arr::dot($config)),
+        )));
     }
 
     private function publishConfig(): void

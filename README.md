@@ -125,7 +125,9 @@ php artisan mailtrap:install --without-webhook --no-interaction  # not sending t
 
 The wizard is safe to re-run on a site that is already configured: it preselects the
 current settings, lets you keep or replace the API token, and offers to replace the
-existing webhook (Mailtrap never shows an old secret again). Non-interactive:
+existing webhook (Mailtrap never shows an old secret again). It never overwrites a
+published `config/manta_mailtrap.php`, but lists the keys that file lacks compared to the
+installed version. Non-interactive:
 
 ```bash
 php artisan mailtrap:install --webhook --replace --token=new_token --no-interaction

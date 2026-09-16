@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`mailtrap:install` lists config keys a published `config/manta_mailtrap.php` lacks.**
+  A published section replaces the package section as a whole, so keys added in newer
+  versions silently run on their defaults. The file itself is never overwritten, since it
+  holds the app's own route, middleware and layout.
+
 ### Fixed
 
 - **`mailtrap:install` wrote the account API token as SMTP password.** Mailtrap only

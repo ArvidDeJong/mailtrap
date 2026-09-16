@@ -135,6 +135,24 @@ it('writes a new token passed to a non-interactive install', function (): void {
     expect(envContents())->toBe("MAILTRAP_API_TOKEN=new-token\nMAILTRAP_WEBHOOK_ENABLED=true\nMAILTRAP_WEBHOOK_SECRET=".NEW_SECRET."\n");
 });
 
+it('lists keys a published config lacks without overwriting it', function (): void {
+    Http::fake();
+    $published = config_path('manta_mailtrap.php');
+    $contents = "<?php\n\nreturn ['api' => ['token' => null], 'ui' => ['middleware' => ['web', 'auth']]];\n";
+    file_put_contents($published, $contents);
+
+    try {
+        $this->artisan('mailtrap:install', ['--without-webhook' => true, '--skip-migrations' => true, '--no-interaction' => true])
+            ->expectsOutputToContain('api.account_url')
+            ->doesntExpectOutputToContain('ui.middleware')
+            ->assertSuccessful();
+
+        expect(file_get_contents($published))->toBe($contents);
+    } finally {
+        unlink($published);
+    }
+});
+
 it('disables the webhook endpoint when installing without one', function (): void {
     Http::fake();
     file_put_contents($this->envDirectory.'/.env', "APP_NAME=Test\n");
