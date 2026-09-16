@@ -16,6 +16,9 @@ return [
         'token' => env('MAILTRAP_API_TOKEN'),
         'base_url' => env('MAILTRAP_BASE_URL', 'https://api.mailtrap.io/api/v1'),
         'timeout' => env('MAILTRAP_TIMEOUT', 30),
+
+        // Account API used by mailtrap:webhook to create webhooks.
+        'account_url' => env('MAILTRAP_ACCOUNT_API_URL', 'https://mailtrap.io'),
     ],
 
     /*

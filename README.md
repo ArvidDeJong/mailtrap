@@ -78,6 +78,24 @@ Install the package via Composer:
 
 ```bash
 composer require darvis/mailtrap
+php artisan mailtrap:install
+```
+
+`mailtrap:install` runs the migrations, asks for your Mailtrap API token, creates the
+webhook in Mailtrap and writes its signing secret to `.env`. Run it on the server the
+webhook points at. Non-interactive, e.g. in a deploy script:
+
+```bash
+php artisan mailtrap:install --webhook --no-interaction          # uses MAILTRAP_API_TOKEN
+php artisan mailtrap:install --without-webhook --no-interaction  # not sending through Mailtrap
+```
+
+The command is safe to re-run on a site that is already configured: it shows the current
+token, endpoint and secret state, lets you keep or replace the API token, and offers to
+replace the existing webhook (Mailtrap never shows an old secret again). Non-interactive:
+
+```bash
+php artisan mailtrap:install --webhook --replace --token=new_token --no-interaction
 ```
 
 ## ⚙️ Configuration
@@ -264,7 +282,30 @@ in the `Mailtrap-Signature` header. The package verifies it and **fails closed**
 MAILTRAP_WEBHOOK_SECRET=your_32_char_hex_signing_secret
 ```
 
-Copy the secret from the webhook detail panel in Mailtrap. To accept unsigned calls
+#### Generating the signing secret
+
+Mailtrap generates the secret itself and only returns it once, when the webhook is
+created. `mailtrap:webhook` creates the webhook through the Mailtrap API and writes the
+secret to `.env`:
+
+```bash
+php artisan mailtrap:webhook                       # URL: APP_URL/api/webhooks/mailtrap
+php artisan mailtrap:webhook https://example.com/api/webhooks/mailtrap --show
+```
+
+| Option | Effect |
+| --- | --- |
+| `--token=` | API token with admin access; defaults to `MAILTRAP_API_TOKEN` |
+| `--stream=` | `transactional` (default) or `bulk` |
+| `--domain-id=` | Only events for one sending domain |
+| `--replace` | Delete an existing webhook for the same URL first — its secret cannot be read back |
+| `--show` | Print the secret instead of writing it, for when you run the command on another machine |
+
+The webhook subscribes to `delivery`, `open`, `click`, `bounce`, `spam_complaint` and
+`reject` with the JSON payload format. When the configuration or routes are cached,
+both caches are rebuilt so the new secret is live immediately.
+
+Alternatively, copy the secret from the webhook detail panel in Mailtrap. To accept unsigned calls
 anyway — not recommended, the endpoint writes to `email_validations` and `mail_logs`:
 
 ```env

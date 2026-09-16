@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`mailtrap:webhook` command.** Creates the email sending webhook through the
+  Mailtrap API and writes the signing secret, which Mailtrap returns only on creation,
+  to `.env` together with `MAILTRAP_WEBHOOK_ENABLED=true`. Refuses local URLs, offers
+  to replace an existing webhook for the same URL, and rebuilds cached config and
+  routes so the secret takes effect without a redeploy. `--show` prints the secret
+  instead of writing it.
+- **`mailtrap:install` command.** Runs the migrations, optionally publishes the
+  config, asks for the API token and sets up the webhook in one run — or disables the
+  endpoint with `--without-webhook`. Works non-interactively with `--webhook` or
+  `--without-webhook`.
+  Re-running it on a configured site shows the current state (token, endpoint,
+  secret, and a stale config cache) and lets you swap the token or replace the webhook.
+- `api.account_url` config (`MAILTRAP_ACCOUNT_API_URL`, default `https://mailtrap.io`)
+  for the account API used by these commands.
+
 ## [1.1.0] - 2026-09-10
 
 ### Security

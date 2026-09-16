@@ -53,6 +53,8 @@ For every handled event, `upsertMailLogFromWebhook()` either updates the existin
 
 Webhook signature verification runs in [VerifyMailtrapWebhookSignature](src/Http/Middleware/VerifyMailtrapWebhookSignature.php), attached as route middleware in the service provider — not inline in the controller. It checks the HMAC-SHA256 of the **raw** request body against the `Mailtrap-Signature` header and **fails closed**: with `webhook.verify_signature` on and no `webhook.secret`, every call is rejected with 403. Never re-encode the body before hashing; Mailtrap signs the bytes as sent. The route itself is only registered when `webhook.enabled` is true.
 
+The secret cannot be chosen locally: Mailtrap generates it and returns it only in the create response. `mailtrap:webhook` ([MailtrapWebhookCommand](src/Console/Commands/MailtrapWebhookCommand.php)) creates the webhook via [MailtrapWebhookApi](src/Services/MailtrapWebhookApi.php) and writes the secret with [EnvironmentFile](src/Support/EnvironmentFile.php); `mailtrap:install` wraps it. Both rebuild cached config/routes after writing `.env`, otherwise the cached config keeps the old (empty) secret.
+
 ### Validation states
 
 `email_validations.status` is one of `valid` / `invalid` / `blocked`:

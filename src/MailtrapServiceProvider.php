@@ -2,7 +2,9 @@
 
 namespace Darvis\Mailtrap;
 
+use Darvis\Mailtrap\Console\Commands\MailtrapInstallCommand;
 use Darvis\Mailtrap\Console\Commands\MailtrapTestCommand;
+use Darvis\Mailtrap\Console\Commands\MailtrapWebhookCommand;
 use Darvis\Mailtrap\Http\Middleware\VerifyMailtrapWebhookSignature;
 use Darvis\Mailtrap\Livewire\MailtrapInbox;
 use Darvis\Mailtrap\Providers\MailServiceProvider;
@@ -55,7 +57,9 @@ class MailtrapServiceProvider extends ServiceProvider
         // Registreer de Artisan-commando's (alleen relevant in de console).
         if ($this->app->runningInConsole()) {
             $this->commands([
+                MailtrapInstallCommand::class,
                 MailtrapTestCommand::class,
+                MailtrapWebhookCommand::class,
             ]);
         }
 
