@@ -27,15 +27,11 @@ class MailtrapServiceProvider extends ServiceProvider
             'manta_mailtrap'
         );
 
-        // Registreer de MailServiceProvider
+        // Validation and logging of outgoing mail.
         $this->app->register(MailServiceProvider::class);
 
-        // Bind de Mailtrap service in de container
-        $this->app->singleton(MailtrapService::class, function ($app) {
-            return new MailtrapService;
-        });
-
-        // Alias voor gemakkelijke toegang
+        // Deprecated: MailtrapService and the app('mailtrap') alias are removed in 2.0.
+        $this->app->singleton(MailtrapService::class);
         $this->app->alias(MailtrapService::class, 'mailtrap');
     }
 
@@ -46,15 +42,15 @@ class MailtrapServiceProvider extends ServiceProvider
     {
         $this->registerWebhookRoute();
 
-        // Publiceer migrations
+        // Publish the migrations.
         $this->publishes([
             __DIR__.'/../database/migrations/' => database_path('migrations'),
         ], 'mailtrap-migrations');
 
-        // Load migrations automatisch als package wordt gebruikt
+        // Load the migrations automatically, so publishing them is optional.
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
-        // Registreer de Artisan-commando's (alleen relevant in de console).
+        // Register the Artisan commands (only relevant in the console).
         if ($this->app->runningInConsole()) {
             $this->commands([
                 MailtrapInstallCommand::class,
@@ -63,12 +59,12 @@ class MailtrapServiceProvider extends ServiceProvider
             ]);
         }
 
-        // Publiceer config bestanden
+        // Publish the config file.
         $this->publishes([
             __DIR__.'/../config/manta_mailtrap.php' => config_path('manta_mailtrap.php'),
         ], 'mailtrap-config');
 
-        // Laad de package views onder de "mailtrap" namespace.
+        // Load the package views under the "mailtrap" namespace.
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'mailtrap');
 
         $this->publishes([
@@ -97,10 +93,10 @@ class MailtrapServiceProvider extends ServiceProvider
     }
 
     /**
-     * Registreer de Livewire/Flux inbox-component en bijbehorende route.
+     * Register the Livewire/Flux inbox component and its route.
      *
-     * De UI is optioneel en wordt alleen geregistreerd wanneer Livewire
-     * aanwezig is in de host-applicatie en de UI in de config is ingeschakeld.
+     * The UI is optional and only registered when Livewire is installed in
+     * the host application and the UI is enabled in the config.
      */
     protected function registerInboxUi(): void
     {
@@ -114,8 +110,8 @@ class MailtrapServiceProvider extends ServiceProvider
 
         Livewire::component('mailtrap-inbox', MailtrapInbox::class);
 
-        // Routes pas registreren als alle providers gebooted zijn, zodat de
-        // Route::livewire() macro van Livewire gegarandeerd beschikbaar is.
+        // Register the route once every provider has booted, so Livewire's
+        // Route::livewire() macro is guaranteed to be available.
         $this->app->booted(function (): void {
             $path = '/'.ltrim((string) config('manta_mailtrap.ui.route', 'mailtrap'), '/');
             $middleware = config('manta_mailtrap.ui.middleware', ['web']);

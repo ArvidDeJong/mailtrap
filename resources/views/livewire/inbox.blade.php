@@ -2,18 +2,18 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <flux:heading size="xl">Mailtrap inbox</flux:heading>
-            <flux:subheading>Controleer of uitgaande mail werkt — elke verzending wordt hier gelogd.</flux:subheading>
+            <flux:subheading>Check that outgoing mail works — every send is logged here.</flux:subheading>
         </div>
         <div class="flex items-center gap-2">
-            <flux:button wire:click="$refresh" icon="arrow-path" variant="ghost">Vernieuwen</flux:button>
+            <flux:button wire:click="$refresh" icon="arrow-path" variant="ghost">Refresh</flux:button>
             <flux:button
                 wire:click="cleanup"
-                wire:confirm="Alle logs ouder dan {{ (int) config('manta_mailtrap.logging.cleanup_after_days', 30) }} dagen verwijderen?"
+                wire:confirm="Delete all logs older than {{ (int) config('manta_mailtrap.logging.cleanup_after_days', 30) }} days?"
                 icon="trash"
                 variant="subtle"
-            >Opschonen</flux:button>
+            >Clean up</flux:button>
             <flux:modal.trigger name="send-test">
-                <flux:button icon="paper-airplane" variant="primary">Testmail versturen</flux:button>
+                <flux:button icon="paper-airplane" variant="primary">Send test mail</flux:button>
             </flux:modal.trigger>
         </div>
     </div>
@@ -24,23 +24,23 @@
         </flux:callout>
     @endif
 
-    {{-- Statistieken --}}
+    {{-- Statistics --}}
     <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <flux:card class="space-y-1">
-            <flux:text size="sm">Totaal</flux:text>
-            <flux:heading size="lg">{{ number_format($this->stats['total'], 0, ',', '.') }}</flux:heading>
+            <flux:text size="sm">Total</flux:text>
+            <flux:heading size="lg">{{ number_format($this->stats['total']) }}</flux:heading>
         </flux:card>
         <flux:card class="space-y-1">
-            <flux:text size="sm">Verzonden</flux:text>
-            <flux:heading size="lg" class="text-green-600 dark:text-green-400">{{ number_format($this->stats['sent'], 0, ',', '.') }}</flux:heading>
+            <flux:text size="sm">Sent</flux:text>
+            <flux:heading size="lg" class="text-green-600 dark:text-green-400">{{ number_format($this->stats['sent']) }}</flux:heading>
         </flux:card>
         <flux:card class="space-y-1">
-            <flux:text size="sm">In afwachting</flux:text>
-            <flux:heading size="lg" class="text-yellow-600 dark:text-yellow-400">{{ number_format($this->stats['pending'], 0, ',', '.') }}</flux:heading>
+            <flux:text size="sm">Pending</flux:text>
+            <flux:heading size="lg" class="text-yellow-600 dark:text-yellow-400">{{ number_format($this->stats['pending']) }}</flux:heading>
         </flux:card>
         <flux:card class="space-y-1">
-            <flux:text size="sm">Mislukt</flux:text>
-            <flux:heading size="lg" class="text-red-600 dark:text-red-400">{{ number_format($this->stats['failed'], 0, ',', '.') }}</flux:heading>
+            <flux:text size="sm">Failed</flux:text>
+            <flux:heading size="lg" class="text-red-600 dark:text-red-400">{{ number_format($this->stats['failed']) }}</flux:heading>
         </flux:card>
     </div>
 
@@ -49,26 +49,26 @@
         <flux:input
             wire:model.live.debounce.400ms="search"
             icon="magnifying-glass"
-            placeholder="Zoek op ontvanger, afzender of onderwerp…"
+            placeholder="Search recipient, sender or subject…"
             class="sm:max-w-md"
         />
         <flux:select wire:model.live="status" class="sm:max-w-xs">
-            <flux:select.option value="">Alle statussen</flux:select.option>
-            <flux:select.option value="sent">Verzonden</flux:select.option>
-            <flux:select.option value="pending">In afwachting</flux:select.option>
-            <flux:select.option value="failed">Mislukt</flux:select.option>
-            <flux:select.option value="blocked">Geblokkeerd</flux:select.option>
+            <flux:select.option value="">All statuses</flux:select.option>
+            <flux:select.option value="sent">Sent</flux:select.option>
+            <flux:select.option value="pending">Pending</flux:select.option>
+            <flux:select.option value="failed">Failed</flux:select.option>
+            <flux:select.option value="blocked">Blocked</flux:select.option>
         </flux:select>
     </div>
 
-    {{-- Tabel --}}
+    {{-- Table --}}
     <flux:table :paginate="$this->logs">
         <flux:table.columns>
             <flux:table.column>Status</flux:table.column>
-            <flux:table.column>Ontvanger</flux:table.column>
-            <flux:table.column>Onderwerp</flux:table.column>
-            <flux:table.column>Afzender</flux:table.column>
-            <flux:table.column>Tijd</flux:table.column>
+            <flux:table.column>Recipient</flux:table.column>
+            <flux:table.column>Subject</flux:table.column>
+            <flux:table.column>Sender</flux:table.column>
+            <flux:table.column>Time</flux:table.column>
         </flux:table.columns>
 
         <flux:table.rows>
@@ -85,7 +85,7 @@
                 </flux:table.row>
             @empty
                 <flux:table.row>
-                    <flux:table.cell colspan="5" class="text-center text-zinc-500">Geen mails gevonden.</flux:table.cell>
+                    <flux:table.cell colspan="5" class="text-center text-zinc-500">No mail found.</flux:table.cell>
                 </flux:table.row>
             @endforelse
         </flux:table.rows>
@@ -97,27 +97,27 @@
             @php($meta = $this->statusMeta($this->selectedLog->status_code))
             <div class="space-y-4">
                 <div class="flex items-center justify-between gap-3">
-                    <flux:heading size="lg">Maildetails</flux:heading>
+                    <flux:heading size="lg">Mail details</flux:heading>
                     <flux:badge :color="$meta['color']">{{ $meta['label'] }}</flux:badge>
                 </div>
 
                 <flux:separator />
 
                 <dl class="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
-                    <dt class="text-zinc-500">Ontvanger</dt>
+                    <dt class="text-zinc-500">Recipient</dt>
                     <dd class="col-span-2 font-medium">{{ $this->selectedLog->recipient }}</dd>
 
-                    <dt class="text-zinc-500">Afzender</dt>
+                    <dt class="text-zinc-500">Sender</dt>
                     <dd class="col-span-2">{{ $this->selectedLog->sender }}</dd>
 
-                    <dt class="text-zinc-500">Onderwerp</dt>
+                    <dt class="text-zinc-500">Subject</dt>
                     <dd class="col-span-2">{{ $this->selectedLog->subject ?: '—' }}</dd>
 
                     <dt class="text-zinc-500">Status</dt>
-                    <dd class="col-span-2">{{ $this->selectedLog->status_code ?? 'in afwachting' }}</dd>
+                    <dd class="col-span-2">{{ $this->selectedLog->status_code ?? 'pending' }}</dd>
 
                     @if ($this->selectedLog->error_message)
-                        <dt class="text-zinc-500">Foutmelding</dt>
+                        <dt class="text-zinc-500">Error</dt>
                         <dd class="col-span-2 text-red-600 dark:text-red-400">{{ $this->selectedLog->error_message }}</dd>
                     @endif
 
@@ -132,14 +132,14 @@
                     @endif
 
                     @if ($this->selectedLog->source_file)
-                        <dt class="text-zinc-500">Bron</dt>
+                        <dt class="text-zinc-500">Source</dt>
                         <dd class="col-span-2 break-all font-mono text-xs">{{ $this->selectedLog->source_file }}:{{ $this->selectedLog->source_line }}</dd>
                     @endif
 
                     <dt class="text-zinc-500">Message-ID</dt>
                     <dd class="col-span-2 break-all font-mono text-xs">{{ $this->selectedLog->message_id }}</dd>
 
-                    <dt class="text-zinc-500">Tijdstip</dt>
+                    <dt class="text-zinc-500">Sent at</dt>
                     <dd class="col-span-2">{{ $this->selectedLog->created_at?->format('d-m-Y H:i:s') }}</dd>
                 </dl>
 
@@ -148,24 +148,24 @@
                 <div class="flex justify-between gap-2">
                     <flux:button
                         wire:click="deleteLog({{ $this->selectedLog->id }})"
-                        wire:confirm="Deze mail-log verwijderen?"
+                        wire:confirm="Delete this mail log?"
                         icon="trash"
                         variant="danger"
-                    >Verwijderen</flux:button>
+                    >Delete</flux:button>
                     <flux:modal.close>
-                        <flux:button variant="ghost">Sluiten</flux:button>
+                        <flux:button variant="ghost">Close</flux:button>
                     </flux:modal.close>
                 </div>
             </div>
         @endif
     </flux:modal>
 
-    {{-- Testmail versturen --}}
+    {{-- Send test mail --}}
     <flux:modal name="send-test" class="md:w-96">
         <form wire:submit="sendTest" class="space-y-4">
             <div>
-                <flux:heading size="lg">Testmail versturen</flux:heading>
-                <flux:subheading>Verstuurt een mail via de actieve mailer ({{ config('mail.default') }}) en logt het resultaat.</flux:subheading>
+                <flux:heading size="lg">Send test mail</flux:heading>
+                <flux:subheading>Sends a mail through the active mailer ({{ config('mail.default') }}) and logs the result.</flux:subheading>
             </div>
 
             @if ($testResult)
@@ -175,18 +175,18 @@
             @endif
 
             <flux:field>
-                <flux:label>E-mailadres</flux:label>
-                <flux:input type="email" wire:model="testEmail" placeholder="naam@voorbeeld.nl" />
+                <flux:label>Email address</flux:label>
+                <flux:input type="email" wire:model="testEmail" placeholder="name@example.com" />
                 <flux:error name="testEmail" />
             </flux:field>
 
             <div class="flex justify-end gap-2">
                 <flux:modal.close>
-                    <flux:button variant="ghost">Sluiten</flux:button>
+                    <flux:button variant="ghost">Close</flux:button>
                 </flux:modal.close>
                 <flux:button type="submit" variant="primary" icon="paper-airplane">
-                    <span wire:loading.remove wire:target="sendTest">Versturen</span>
-                    <span wire:loading wire:target="sendTest">Bezig…</span>
+                    <span wire:loading.remove wire:target="sendTest">Send</span>
+                    <span wire:loading wire:target="sendTest">Sending…</span>
                 </flux:button>
             </div>
         </form>

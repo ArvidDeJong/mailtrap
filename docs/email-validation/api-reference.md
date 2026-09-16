@@ -59,7 +59,7 @@ $result = EmailValidation::bulkValidationWithCheck($emails, true);
 ```
 
 ### `isBlocked(string $email): bool`
-Checks if an email address is blocked.
+Checks if an email address is blocked. Blocking applies to that exact address only, never to the rest of its domain.
 
 **Parameters:**
 - `$email` - The email address to check
@@ -74,7 +74,7 @@ if (EmailValidation::isBlocked('spam@blocked.com')) {
 ```
 
 ### `isValid(string $email): bool`
-Checks if an email address is valid.
+Checks if an email address is valid, or if another address on the same domain is.
 
 **Parameters:**
 - `$email` - The email address to check
@@ -121,8 +121,8 @@ $validation = EmailValidation::markAsInvalid(
 );
 ```
 
-### `markAsBlocked(string $email, string $reason, ?string $statusCode = null): EmailValidation`
-Marks an email address as blocked.
+### `markAsBlocked(string $email, string $reason, int|string|null $statusCode = null): EmailValidation`
+Marks an email address as blocked. Mail to this address is stopped; other addresses on the domain are not affected.
 
 **Parameters:**
 - `$email` - The email address to mark as blocked
@@ -134,8 +134,8 @@ Marks an email address as blocked.
 **Example:**
 ```php
 $validation = EmailValidation::markAsBlocked(
-    'spam@blocked.com', 
-    'Known spam domain',
+    'spam@blocked.com',
+    'Spam complaint',
     '403'
 );
 ```
@@ -183,7 +183,6 @@ The model uses HTTP-like status codes:
 
 - `200` - Successfully validated
 - `400` - Invalid format or DNS problems
-- `403` - Blocked domain
 - `404` - Domain not found
 - `500` - Server/validation error
 

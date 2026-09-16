@@ -4,298 +4,166 @@ namespace Darvis\Mailtrap\Http\Controllers;
 
 use Darvis\Mailtrap\Models\EmailValidation;
 use Darvis\Mailtrap\Models\MailLog;
+use Darvis\Mailtrap\Support\PackageLog;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Log;
 
 class MailtrapWebhookController extends Controller
 {
     /**
-     * Schrijf alleen naar de Laravel Log facade als dat in de config is ingeschakeld.
+     * What each Mailtrap event says about the address, and the status code to
+     * record when the event carries none.
+     *
+     * Other events (soft bounce, unsubscribe, suspension) are acknowledged and
+     * counted as skipped.
+     *
+     * @var array<string, array{0: string, 1: int}>
      */
-    private function log(string $level, string $message, array $context = []): void
+    private const EVENTS = [
+        'delivery' => [EmailValidation::VALID, 200],
+        'open' => [EmailValidation::VALID, 200],
+        'click' => [EmailValidation::VALID, 200],
+        'bounce' => [EmailValidation::INVALID, 550],
+        'spam' => [EmailValidation::INVALID, 400],
+        'reject' => [EmailValidation::INVALID, 450],
+    ];
+
+    /**
+     * Handle a batch of Mailtrap events (up to 500, sent every 30 seconds).
+     *
+     * Always answers 200 once the payload is readable, so a failing event does
+     * not make Mailtrap retry the whole batch; failures are counted as skipped.
+     */
+    public function handle(Request $request): JsonResponse
     {
-        if (! config('manta_mailtrap.logging.log_to_laravel', false)) {
-            return;
+        $startTime = microtime(true);
+
+        PackageLog::info('Mailtrap webhook received', ['payload' => $request->all()]);
+
+        $events = $request->input('events');
+
+        if (! is_array($events)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No valid events found in webhook payload',
+            ], 400);
         }
 
-        Log::{$level}($message, $context);
+        $stats = ['valid_emails' => 0, 'invalid_emails' => 0, 'skipped' => 0];
+        $handled = [];
+
+        foreach ($events as $event) {
+            if (! is_array($event) || ! is_string($event['email'] ?? null) || ! is_string($event['event'] ?? null)) {
+                $stats['skipped']++;
+
+                continue;
+            }
+
+            // Several events for one address are normal (a delivery, then an open);
+            // only the very same event twice is a duplicate.
+            $key = $event['event_id'] ?? implode('|', [$event['message_id'] ?? '', $event['event'], $event['email']]);
+
+            if (isset($handled[$key])) {
+                $stats['skipped']++;
+
+                continue;
+            }
+
+            $handled[$key] = true;
+
+            $context = array_filter([
+                'event' => $event['event'],
+                'email' => $event['email'],
+                'message_id' => $event['message_id'] ?? null,
+                'category' => $event['category'] ?? null,
+                'response' => $event['response'] ?? null,
+                'response_code' => $event['response_code'] ?? null,
+                'bounce_category' => $event['bounce_category'] ?? null,
+                'timestamp' => $event['timestamp'] ?? null,
+                'sending_stream' => $event['sending_stream'] ?? null,
+            ], fn (mixed $value): bool => $value !== null);
+
+            [$status, $defaultStatusCode] = self::EVENTS[$event['event']] ?? [null, null];
+
+            if ($status === null) {
+                PackageLog::info('Mailtrap event needs no action', $context);
+                $stats['skipped']++;
+
+                continue;
+            }
+
+            try {
+                $this->apply($event, $status, $defaultStatusCode);
+            } catch (\Throwable $e) {
+                PackageLog::error('Failed to process Mailtrap event', $context + ['error' => $e->getMessage()]);
+                $stats['skipped']++;
+
+                continue;
+            }
+
+            PackageLog::info("Email marked as {$status} by Mailtrap webhook", $context);
+            $stats[$status === EmailValidation::VALID ? 'valid_emails' : 'invalid_emails']++;
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Webhook processed',
+            'stats' => $stats + [
+                'total_processed' => count($handled),
+                'total_events' => count($events),
+                'processing_time_ms' => round((microtime(true) - $startTime) * 1000),
+            ],
+        ]);
     }
 
     /**
-     * Werk een bestaand MailLog record bij op message_id, of maak een nieuw record aan.
+     * Record the event on the address and on the mail log.
+     *
+     * @param  array<string, mixed>  $event
      */
-    private function upsertMailLogFromWebhook(
-        ?string $messageId,
-        string $email,
-        string $eventType,
-        ?string $statusCode,
-        ?string $reason,
-        ?string $sendingDomainName = null,
-        ?string $category = null
-    ): void {
+    private function apply(array $event, string $status, int $defaultStatusCode): void
+    {
+        $email = $event['email'];
+        $statusCode = (string) ($event['response_code'] ?? $defaultStatusCode);
+        $reason = $status === EmailValidation::VALID
+            ? null
+            : (string) ($event['response'] ?? $event['reason'] ?? "Mailtrap reported a {$event['event']} event");
+
+        if ($status === EmailValidation::VALID) {
+            EmailValidation::markAsValid($email);
+        } else {
+            EmailValidation::markAsInvalid($email, $reason, $statusCode);
+        }
+
+        $messageId = $event['message_id'] ?? null;
+
         if (! $messageId) {
             return;
         }
 
-        $updatedRows = MailLog::where('message_id', $messageId)
-            ->update(['status_code' => $statusCode]);
+        // Recipients of one message share its id, so match the recipient as well.
+        $updated = MailLog::where('message_id', $messageId)
+            ->whereRaw('lower(recipient) = ?', [strtolower($email)])
+            ->update(array_filter(
+                ['status_code' => $statusCode, 'error_message' => $reason],
+                fn (?string $value): bool => $value !== null,
+            ));
 
-        if ($updatedRows > 0) {
+        if ($updated > 0) {
             return;
         }
 
+        // The local MessageSending listener may not have run, e.g. for mail sent
+        // through the Mailtrap API directly.
         MailLog::create([
             'message_id' => $messageId,
-            'sender' => $sendingDomainName,
+            'sender' => $event['sending_domain_name'] ?? null,
             'recipient' => $email,
-            'subject' => $category ?? 'Mailtrap webhook '.$eventType,
+            'subject' => $event['category'] ?? 'Mailtrap webhook '.$event['event'],
             'status_code' => $statusCode,
             'error_message' => $reason,
             'type' => 'webhook',
         ]);
-    }
-
-    /**
-     * Verwerkt de inkomende webhook verzoeken van Mailtrap.
-     *
-     * Mailtrap stuurt events in batches (tot 500 per keer) elke 30 seconden.
-     * Elke batch bevat een array van events met informatie over e-mailbezorging.
-     *
-     * @return Response
-     */
-    public function handle(Request $request)
-    {
-        // Start de timer voor webhook verwerking
-        $startTime = microtime(true);
-
-        // Log de inkomende webhook voor debugging
-        $this->log('info', 'Mailtrap webhook ontvangen', [
-            'payload' => $request->all(),
-        ]);
-
-        // Valideer dat we een geldig webhook verzoek hebben ontvangen
-        if (! $request->has('events') || ! is_array($request->input('events'))) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Geen geldige events gevonden in webhook data',
-            ], 400);
-        }
-
-        $events = $request->input('events');
-        $processedEmails = [];
-        $validCount = 0;
-        $invalidCount = 0;
-        $skippedCount = 0;
-
-        foreach ($events as $event) {
-            // Controleer of het event de benodigde velden bevat
-            if (! isset($event['email']) || ! isset($event['event'])) {
-                $skippedCount++;
-
-                continue;
-            }
-
-            $email = $event['email'];
-            $eventType = $event['event'];
-            $messageId = $event['message_id'] ?? null;
-            $category = $event['category'] ?? null;
-            $timestamp = $event['timestamp'] ?? null;
-            $sendingStream = $event['sending_stream'] ?? null;
-            $sendingDomainName = $event['sending_domain_name'] ?? null;
-            $responseCode = $event['response_code'] ?? null;
-            $response = $event['response'] ?? null;
-
-            // Voorkom dubbele verwerking van hetzelfde e-mailadres in dezelfde webhook call
-            if (in_array($email, $processedEmails)) {
-                $skippedCount++;
-
-                continue;
-            }
-
-            $processedEmails[] = $email;
-
-            try {
-                // Verschillende eventTypes verwerken
-                switch ($eventType) {
-                    case 'delivery':
-                        // Een succesvolle aflevering betekent dat het e-mailadres geldig is
-                        // Bij delivery events stuurt Mailtrap geen response_code, dus gebruiken we 200
-                        EmailValidation::markAsValid($email);
-
-                        // Update MailLog met succesvolle status
-                        $this->upsertMailLogFromWebhook(
-                            $messageId,
-                            $email,
-                            $eventType,
-                            (string) ($responseCode ?? 200),
-                            null,
-                            $sendingDomainName,
-                            $category
-                        );
-
-                        $this->log('info', "Email {$email} gemarkeerd als geldig via Mailtrap webhook (delivery event)", [
-                            'message_id' => $messageId,
-                            'category' => $category,
-                            'timestamp' => $timestamp,
-                            'sending_stream' => $sendingStream,
-                            'response_code' => $responseCode ?? 200,
-                        ]);
-                        $validCount++;
-                        break;
-
-                    case 'bounce':
-                        // Hard bounce - e-mailadres bestaat niet of domein is ongeldig
-                        $reason = $response ?? $event['reason'] ?? 'E-mail kon niet worden afgeleverd (bounce)';
-                        EmailValidation::markAsInvalid($email, $reason, $responseCode ?? 550);
-
-                        // Update MailLog met bounce status
-                        $this->upsertMailLogFromWebhook(
-                            $messageId,
-                            $email,
-                            $eventType,
-                            (string) ($responseCode ?? 550),
-                            $reason,
-                            $sendingDomainName,
-                            $category
-                        );
-
-                        $this->log('info', "Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (bounce event)", [
-                            'message_id' => $messageId,
-                            'category' => $category,
-                            'reason' => $reason,
-                            'response' => $response,
-                            'response_code' => $responseCode,
-                            'bounce_category' => $event['bounce_category'] ?? null,
-                            'timestamp' => $timestamp,
-                            'sending_stream' => $sendingStream,
-                        ]);
-                        $invalidCount++;
-                        break;
-
-                    case 'spam':
-                        // E-mail is als spam gemarkeerd door ontvanger
-                        $reason = $response ?? $event['reason'] ?? 'E-mail is als spam gemarkeerd';
-                        EmailValidation::markAsInvalid($email, $reason, $responseCode ?? 400);
-
-                        // Update MailLog met spam status
-                        $this->upsertMailLogFromWebhook(
-                            $messageId,
-                            $email,
-                            $eventType,
-                            (string) ($responseCode ?? 400),
-                            $reason,
-                            $sendingDomainName,
-                            $category
-                        );
-
-                        $this->log('info', "Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (spam event)", [
-                            'message_id' => $messageId,
-                            'category' => $category,
-                            'reason' => $reason,
-                            'response' => $response,
-                            'response_code' => $responseCode,
-                            'timestamp' => $timestamp,
-                            'sending_stream' => $sendingStream,
-                        ]);
-                        $invalidCount++;
-                        break;
-
-                    case 'reject':
-                        // E-mail is geweigerd door ontvanger of provider
-                        $reason = $response ?? $event['reason'] ?? 'E-mail is geweigerd door ontvanger';
-                        EmailValidation::markAsInvalid($email, $reason, $responseCode ?? 450);
-
-                        // Update MailLog met reject status
-                        $this->upsertMailLogFromWebhook(
-                            $messageId,
-                            $email,
-                            $eventType,
-                            (string) ($responseCode ?? 450),
-                            $reason,
-                            $sendingDomainName,
-                            $category
-                        );
-
-                        $this->log('info', "Email {$email} gemarkeerd als ongeldig via Mailtrap webhook (reject event)", [
-                            'message_id' => $messageId,
-                            'category' => $category,
-                            'reason' => $reason,
-                            'response' => $response,
-                            'response_code' => $responseCode,
-                            'timestamp' => $timestamp,
-                            'sending_stream' => $sendingStream,
-                        ]);
-                        $invalidCount++;
-                        break;
-
-                    case 'open':
-                    case 'click':
-                        // Deze events betekenen impliciet dat het e-mailadres geldig is
-                        // (gebruiker heeft e-mail geopend of op een link geklikt)
-                        EmailValidation::markAsValid($email);
-
-                        // Update MailLog met succesvolle status (open/click betekent succesvolle aflevering)
-                        $this->upsertMailLogFromWebhook(
-                            $messageId,
-                            $email,
-                            $eventType,
-                            (string) ($responseCode ?? 200),
-                            null,
-                            $sendingDomainName,
-                            $category
-                        );
-
-                        $this->log('info', "Email {$email} gemarkeerd als geldig via Mailtrap webhook ({$eventType} event)", [
-                            'message_id' => $messageId,
-                            'category' => $category,
-                            'timestamp' => $timestamp,
-                            'sending_stream' => $sendingStream,
-                            'response_code' => $responseCode ?? 200,
-                        ]);
-                        $validCount++;
-                        break;
-
-                        // Andere events kunnen worden toegevoegd indien nodig
-                    default:
-                        // Voor andere events doen we niets met de e-mailvalidatie
-                        $this->log('info', "Mailtrap event {$eventType} ontvangen voor {$email}, geen actie ondernomen", [
-                            'message_id' => $messageId,
-                            'category' => $category,
-                            'timestamp' => $timestamp,
-                            'sending_stream' => $sendingStream,
-                        ]);
-                        $skippedCount++;
-                        break;
-                }
-            } catch (\Exception $e) {
-                $this->log('error', "Fout bij verwerken van Mailtrap webhook voor {$email}", [
-                    'error' => $e->getMessage(),
-                    'event_type' => $eventType,
-                    'message_id' => $messageId,
-                    'timestamp' => $timestamp,
-                    'sending_stream' => $sendingStream,
-                ]);
-                $skippedCount++;
-            }
-        }
-
-        // Bereken de verwerkingstijd
-        $processingTime = round((microtime(true) - $startTime) * 1000); // in milliseconds
-
-        // Altijd een succesrespons terugsturen naar Mailtrap binnen de 30 seconden timeout
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Webhook verwerkt',
-            'stats' => [
-                'valid_emails' => $validCount,
-                'invalid_emails' => $invalidCount,
-                'skipped' => $skippedCount,
-                'total_processed' => count($processedEmails),
-                'total_events' => count($events),
-                'processing_time_ms' => $processingTime,
-            ],
-        ], 200);
     }
 }

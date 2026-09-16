@@ -59,18 +59,18 @@ class MailtrapInbox extends Component
             $this->reset('selectedId', 'showDetail');
         }
 
-        $this->notice = 'Mail-log verwijderd.';
+        $this->notice = 'Mail log deleted.';
     }
 
     public function cleanup(): void
     {
         $days = (int) config('manta_mailtrap.logging.cleanup_after_days', 30);
 
-        $deleted = MailLog::where('created_at', '<', now()->subDays($days))->delete();
+        $deleted = (new MailLog)->prunable()->delete();
 
         $this->resetPage();
 
-        $this->notice = "{$deleted} log(s) ouder dan {$days} dagen verwijderd.";
+        $this->notice = "Deleted {$deleted} log(s) older than {$days} days.";
     }
 
     public function sendTest(): void
@@ -81,16 +81,16 @@ class MailtrapInbox extends Component
 
         try {
             Mail::raw(
-                'Mailtrap testmail — verstuurd op '.now()->toDateTimeString().'.',
+                'Mailtrap test mail — sent at '.now()->toDateTimeString().'.',
                 function ($message): void {
                     $message->to($this->testEmail)
-                        ->subject('Mailtrap testmail '.now()->format('H:i:s'));
+                        ->subject('Mailtrap test mail '.now()->format('H:i:s'));
                 }
             );
 
             $this->testResult = [
                 'ok' => true,
-                'message' => "Verzonden via mailer '".config('mail.default')."'. Het resultaat verschijnt in de lijst hieronder.",
+                'message' => "Sent through mailer '".config('mail.default')."'. The result appears in the list below.",
             ];
 
             $this->resetPage();
@@ -110,11 +110,11 @@ class MailtrapInbox extends Component
     public function statusMeta(int|string|null $code): array
     {
         return match (true) {
-            $code === null => ['label' => 'In afwachting', 'color' => 'yellow'],
-            (string) $code === '200' => ['label' => 'Verzonden', 'color' => 'green'],
-            (int) $code === 550 => ['label' => 'Geblokkeerd', 'color' => 'red'],
-            (int) $code === 400 => ['label' => 'Ongeldig', 'color' => 'orange'],
-            default => ['label' => 'Mislukt ('.$code.')', 'color' => 'red'],
+            $code === null => ['label' => 'Pending', 'color' => 'yellow'],
+            (string) $code === MailLog::STATUS_SENT => ['label' => 'Sent', 'color' => 'green'],
+            (string) $code === MailLog::STATUS_BLOCKED => ['label' => 'Blocked', 'color' => 'red'],
+            (int) $code === 400 => ['label' => 'Invalid', 'color' => 'orange'],
+            default => ['label' => 'Failed ('.$code.')', 'color' => 'red'],
         };
     }
 
@@ -126,9 +126,9 @@ class MailtrapInbox extends Component
     {
         return [
             'total' => MailLog::count(),
-            'sent' => MailLog::where('status_code', '200')->count(),
-            'pending' => MailLog::whereNull('status_code')->count(),
-            'failed' => MailLog::whereNotNull('status_code')->where('status_code', '!=', '200')->count(),
+            'sent' => MailLog::successful()->count(),
+            'pending' => MailLog::pending()->count(),
+            'failed' => MailLog::failed()->count(),
         ];
     }
 
@@ -146,10 +146,10 @@ class MailtrapInbox extends Component
                         ->orWhere('subject', 'like', $term);
                 });
             })
-            ->when($this->status === 'sent', fn ($q) => $q->where('status_code', '200'))
-            ->when($this->status === 'pending', fn ($q) => $q->whereNull('status_code'))
-            ->when($this->status === 'blocked', fn ($q) => $q->where('status_code', 550))
-            ->when($this->status === 'failed', fn ($q) => $q->whereNotNull('status_code')->where('status_code', '!=', '200'))
+            ->when($this->status === 'sent', fn ($q) => $q->successful())
+            ->when($this->status === 'pending', fn ($q) => $q->pending())
+            ->when($this->status === 'blocked', fn ($q) => $q->blocked())
+            ->when($this->status === 'failed', fn ($q) => $q->failed())
             ->latest('id')
             ->paginate($perPage);
     }

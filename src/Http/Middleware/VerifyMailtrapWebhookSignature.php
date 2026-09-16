@@ -3,9 +3,9 @@
 namespace Darvis\Mailtrap\Http\Middleware;
 
 use Closure;
+use Darvis\Mailtrap\Support\PackageLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
@@ -37,7 +37,7 @@ class VerifyMailtrapWebhookSignature
         // Fail closed: an unset secret means the endpoint cannot be trusted, and
         // waving requests through would leave it open to anyone who knows the URL.
         if ($secret === '') {
-            $this->log('warning', 'Mailtrap webhook rejected: no signing secret configured. Set MAILTRAP_WEBHOOK_SECRET, or set MAILTRAP_WEBHOOK_VERIFY_SIGNATURE=false to accept unsigned calls.');
+            PackageLog::warning('Mailtrap webhook rejected: no signing secret configured. Set MAILTRAP_WEBHOOK_SECRET, or set MAILTRAP_WEBHOOK_VERIFY_SIGNATURE=false to accept unsigned calls.');
 
             return $this->reject('Webhook signing secret is not configured');
         }
@@ -45,7 +45,7 @@ class VerifyMailtrapWebhookSignature
         $signature = (string) $request->header(self::HEADER, '');
 
         if ($signature === '') {
-            $this->log('warning', 'Mailtrap webhook rejected: missing '.self::HEADER.' header.');
+            PackageLog::warning('Mailtrap webhook rejected: missing '.self::HEADER.' header.');
 
             return $this->reject('Missing webhook signature');
         }
@@ -53,7 +53,7 @@ class VerifyMailtrapWebhookSignature
         $expected = hash_hmac('sha256', $request->getContent(), $secret);
 
         if (! hash_equals($expected, $signature)) {
-            $this->log('warning', 'Mailtrap webhook rejected: signature mismatch.');
+            PackageLog::warning('Mailtrap webhook rejected: signature mismatch.');
 
             return $this->reject('Invalid webhook signature');
         }
@@ -70,19 +70,5 @@ class VerifyMailtrapWebhookSignature
             'status' => 'error',
             'message' => $message,
         ], Response::HTTP_FORBIDDEN);
-    }
-
-    /**
-     * Write to the Laravel log only when the package is configured to do so.
-     *
-     * @param  array<string, mixed>  $context
-     */
-    private function log(string $level, string $message, array $context = []): void
-    {
-        if (! config('manta_mailtrap.logging.log_to_laravel', false)) {
-            return;
-        }
-
-        Log::{$level}($message, $context);
     }
 }

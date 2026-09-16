@@ -3,9 +3,15 @@
 namespace Darvis\Mailtrap\Services;
 
 use Darvis\Mailtrap\Models\EmailValidation;
+use Darvis\Mailtrap\Support\PackageLog;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
+/**
+ * @deprecated since 1.2.0, removed in 2.0. Mailtrap offers no email validation
+ *             endpoint, so validateEmail() cannot succeed against the real API, and
+ *             nothing in the package calls it. Use EmailValidation::validateEmail(),
+ *             which checks the format and MX records locally.
+ */
 class MailtrapService
 {
     protected string $apiToken;
@@ -61,9 +67,7 @@ class MailtrapService
             // Return true for valid email
             return true;
         } catch (\Exception $e) {
-            if (config('manta_mailtrap.logging.log_to_laravel', false)) {
-                Log::error('Mailtrap API error: '.$e->getMessage());
-            }
+            PackageLog::error('Mailtrap API error: '.$e->getMessage());
 
             // Unexpected errors should block the email to prevent excessive retries
             $this->handleFailure($email, 'API error: '.$e->getMessage());

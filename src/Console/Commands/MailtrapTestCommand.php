@@ -12,13 +12,13 @@ class MailtrapTestCommand extends Command
      * @var string
      */
     protected $signature = 'mailtrap:test
-        {email : Het e-mailadres waarnaar de testmail wordt verstuurd}
-        {--mailer= : De te gebruiken mailer (standaard de actieve mail.default)}';
+        {email : The address to send the test mail to}
+        {--mailer= : The mailer to use (defaults to mail.default)}';
 
     /**
      * @var string
      */
-    protected $description = 'Verstuur een testmail en rapporteer het resultaat. Geschikt als health-check in CI (exit-code 0 = ok).';
+    protected $description = 'Send a test mail and report the result. Suitable as a CI health check (exit code 0 = ok).';
 
     public function handle(): int
     {
@@ -27,18 +27,18 @@ class MailtrapTestCommand extends Command
 
         $beforeId = (int) (MailLog::max('id') ?? 0);
 
-        $this->components->info("Testmail versturen naar {$email} via mailer '{$mailer}'…");
+        $this->components->info("Sending test mail to {$email} through mailer '{$mailer}'…");
 
         try {
             Mail::mailer($mailer)->raw(
-                'Mailtrap CLI testmail — '.now()->toDateTimeString().'.',
+                'Mailtrap CLI test mail — '.now()->toDateTimeString().'.',
                 function ($message) use ($email): void {
                     $message->to($email)
                         ->subject('Mailtrap CLI test '.now()->format('H:i:s'));
                 }
             );
         } catch (\Throwable $e) {
-            $this->components->error('Versturen mislukt: '.$e->getMessage());
+            $this->components->error('Sending failed: '.$e->getMessage());
             $this->renderLog($beforeId);
 
             return self::FAILURE;
@@ -47,21 +47,21 @@ class MailtrapTestCommand extends Command
         $log = $this->latestLogSince($beforeId);
 
         if ($log === null) {
-            $this->components->warn('Mail verstuurd, maar geen log gevonden (logging uitgeschakeld?).');
+            $this->components->warn('Mail sent, but no log found (is logging disabled?).');
 
             return self::SUCCESS;
         }
 
         $this->renderLog($beforeId);
 
-        // Een vastgelegde, niet-succesvolle status (bijv. geblokkeerd) telt als mislukt.
-        if ($log->status_code !== null && (string) $log->status_code !== '200') {
-            $this->components->error("Mail niet succesvol afgeleverd (status {$log->status_code}).");
+        // A recorded status other than success (e.g. blocked) counts as a failure.
+        if ($log->status_code !== null && (string) $log->status_code !== MailLog::STATUS_SENT) {
+            $this->components->error("Mail was not delivered successfully (status {$log->status_code}).");
 
             return self::FAILURE;
         }
 
-        $this->components->info('Mail succesvol verstuurd.');
+        $this->components->info('Mail sent successfully.');
 
         return self::SUCCESS;
     }
@@ -79,13 +79,13 @@ class MailtrapTestCommand extends Command
             return;
         }
 
-        $this->table(['Veld', 'Waarde'], [
+        $this->table(['Field', 'Value'], [
             ['Message-ID', $log->message_id],
-            ['Afzender', $log->sender],
-            ['Ontvanger', $log->recipient],
-            ['Onderwerp', $log->subject],
-            ['Status', $log->status_code ?? 'in afwachting'],
-            ['Foutmelding', $log->error_message ?? '—'],
+            ['Sender', $log->sender],
+            ['Recipient', $log->recipient],
+            ['Subject', $log->subject],
+            ['Status', $log->status_code ?? 'pending'],
+            ['Error', $log->error_message ?? '—'],
         ]);
     }
 }

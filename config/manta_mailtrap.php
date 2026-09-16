@@ -7,13 +7,14 @@ return [
     | Mailtrap API Configuration
     |--------------------------------------------------------------------------
     |
-    | Deze configuratie bevat de instellingen voor de Mailtrap API integratie.
-    | Zorg ervoor dat je de juiste API token en instellingen configureert.
+    | Credentials and endpoints for the Mailtrap API. The token needs admin
+    | access to the account for mailtrap:install and mailtrap:webhook.
     |
     */
 
     'api' => [
         'token' => env('MAILTRAP_API_TOKEN'),
+        // Deprecated: not read by the package, removed in 2.0.
         'base_url' => env('MAILTRAP_BASE_URL', 'https://api.mailtrap.io/api/v1'),
         'timeout' => env('MAILTRAP_TIMEOUT', 30),
 
@@ -26,27 +27,27 @@ return [
     | Email Validation Settings
     |--------------------------------------------------------------------------
     |
-    | Configuratie voor email validatie via Mailtrap.
+    | How recipients are validated before a mail is sent.
     |
     */
 
     'validation' => [
-        // Schakel uit om de MX-lookups over te slaan. Die worden synchroon
-        // tijdens het versturen uitgevoerd, dus trage DNS vertraagt de request.
+        // Switch off to skip the MX lookups. They run synchronously while the
+        // mail is sent, so slow DNS slows down the request.
         'enabled' => env('MAILTRAP_VALIDATION_ENABLED', true),
 
-        // Hoe lang een lokaal vastgesteld 'blocked'-resultaat blijft gelden.
-        // Daarna wordt het adres opnieuw gecontroleerd, zodat een tijdelijke
-        // DNS-storing een adres niet voorgoed blokkeert. Zet op 0 om nooit te
-        // verlopen. Statussen uit Mailtrap-events ('valid'/'invalid') worden
-        // nooit lokaal opnieuw afgeleid.
+        // How long a 'blocked' verdict from a local check stays in force. After
+        // that the address is checked again, so a temporary DNS outage does not
+        // block it for good. Set to 0 to never expire. Verdicts from Mailtrap
+        // events ('valid'/'invalid') are never re-derived locally.
         'cache_duration' => env('MAILTRAP_VALIDATION_CACHE_DURATION', 3600), // seconds
 
+        // Deprecated: not read by the package, removed in 2.0.
         'retry_attempts' => env('MAILTRAP_VALIDATION_RETRY_ATTEMPTS', 3),
 
-        // Wanneer true wordt het versturen naar een geblokkeerd adres afgebroken
-        // met een TransportException. Wanneer false gaat de mail gewoon uit en
-        // blijft de reden alleen als error_message op de log staan.
+        // When true, sending to a blocked address is aborted with a
+        // TransportException. When false the mail goes out anyway and the
+        // reason is only kept as error_message on the log.
         'block_invalid' => env('MAILTRAP_BLOCK_INVALID_EMAILS', true),
     ],
 
@@ -55,7 +56,7 @@ return [
     | Mail Logging Settings
     |--------------------------------------------------------------------------
     |
-    | Configuratie voor het loggen van uitgaande emails.
+    | Logging of outgoing mail to the mail_logs table.
     |
     */
 
@@ -63,9 +64,10 @@ return [
         'enabled' => env('MAILTRAP_LOGGING_ENABLED', true),
         'log_successful' => env('MAILTRAP_LOG_SUCCESSFUL', true),
         'log_failed' => env('MAILTRAP_LOG_FAILED', true),
+        // Retention for the inbox cleanup button and `php artisan model:prune`.
         'cleanup_after_days' => env('MAILTRAP_CLEANUP_AFTER_DAYS', 30),
 
-        // Schrijf events ook naar de Laravel Log facade (standaard uit).
+        // Also write events to the Laravel log (off by default).
         'log_to_laravel' => env('MAILTRAP_LOG_TO_LARAVEL', false),
     ],
 
@@ -74,20 +76,20 @@ return [
     | Webhook Settings
     |--------------------------------------------------------------------------
     |
-    | Configuratie voor Mailtrap webhooks.
+    | The endpoint that receives Mailtrap delivery events.
     |
     */
 
     'webhook' => [
-        // Wanneer false wordt de route /api/webhooks/mailtrap niet geregistreerd.
+        // When false, the /api/webhooks/mailtrap route is not registered.
         'enabled' => env('MAILTRAP_WEBHOOK_ENABLED', true),
 
-        // De 32-tekens hex signing secret uit het webhook-detailpaneel in Mailtrap.
+        // The 32-character hex signing secret from the webhook detail panel in Mailtrap.
         'secret' => env('MAILTRAP_WEBHOOK_SECRET'),
 
-        // Controleert de HMAC-SHA256 in de Mailtrap-Signature header. Faalt
-        // dicht: zonder secret worden alle calls met 403 geweigerd. Zet op false
-        // om ongetekende calls te accepteren.
+        // Checks the HMAC-SHA256 in the Mailtrap-Signature header. Fails closed:
+        // without a secret every call is rejected with 403. Set to false to
+        // accept unsigned calls.
         'verify_signature' => env('MAILTRAP_WEBHOOK_VERIFY_SIGNATURE', true),
     ],
 
@@ -96,10 +98,11 @@ return [
     | Rate Limiting
     |--------------------------------------------------------------------------
     |
-    | Configuratie voor rate limiting van API calls.
+    | Rate limiting of API calls.
     |
     */
 
+    // Deprecated: not read by the package, removed in 2.0.
     'rate_limiting' => [
         'enabled' => env('MAILTRAP_RATE_LIMITING_ENABLED', true),
         'max_requests_per_minute' => env('MAILTRAP_MAX_REQUESTS_PER_MINUTE', 60),
@@ -110,10 +113,11 @@ return [
     | Development Settings
     |--------------------------------------------------------------------------
     |
-    | Instellingen specifiek voor development omgeving.
+    | Settings for the development environment.
     |
     */
 
+    // Deprecated: not read by the package, removed in 2.0.
     'development' => [
         'debug_mode' => env('MAILTRAP_DEBUG_MODE', false),
         'log_api_requests' => env('MAILTRAP_LOG_API_REQUESTS', false),
@@ -125,25 +129,25 @@ return [
     | Inbox UI
     |--------------------------------------------------------------------------
     |
-    | Configuratie voor de Mailtrap-achtige inbox: een Livewire/Flux pagina
-    | waarmee je uitgaande mail kunt inspecteren en een testmail kunt sturen.
-    | De UI vereist livewire/livewire en livewire/flux in de host-applicatie.
+    | A Mailtrap-style inbox: a Livewire/Flux page to inspect outgoing mail
+    | and send a test mail. It requires livewire/livewire and livewire/flux
+    | in the host application.
     |
     */
 
     'ui' => [
         'enabled' => env('MAILTRAP_UI_ENABLED', true),
 
-        // Pad waarop de inbox bereikbaar is, bijv. https://app.test/mailtrap
+        // Path of the inbox, e.g. https://app.test/mailtrap
         'route' => env('MAILTRAP_UI_ROUTE', 'mailtrap'),
 
-        // Komma-gescheiden lijst van middleware, bijv. "web,auth" of "web,staff".
+        // Comma-separated list of middleware, e.g. "web,auth" or "web,staff".
         'middleware' => array_values(array_filter(array_map(
             'trim',
             explode(',', (string) env('MAILTRAP_UI_MIDDLEWARE', 'web'))
         ))),
 
-        // Blade-layout waarin de full-page component wordt gerenderd.
+        // Blade layout the full-page component is rendered in.
         'layout' => env('MAILTRAP_UI_LAYOUT', 'components.layouts.app'),
 
         'per_page' => (int) env('MAILTRAP_UI_PER_PAGE', 25),

@@ -1,18 +1,18 @@
 <?php
 
 /**
- * Voorbeeld van hoe Mailtrap webhook response_code verwerking werkt
- * 
- * Dit bestand toont de verwachte werking van de MailtrapWebhookController
- * bij het verwerken van response_code informatie uit Mailtrap webhooks.
- * 
+ * Example of how the webhook controller handles Mailtrap's response_code.
+ *
+ * This file shows what MailtrapWebhookController does with the response_code
+ * information in Mailtrap webhook events.
+ *
  * @package Darvis\Mailtrap
  */
 
-// Dit is een voorbeeld bestand - niet uitvoeren in productie
+// This is an example file - do not run it in production
 // require_once __DIR__ . '/../vendor/autoload.php';
 
-// Simuleer de voorbeelddata van Mailtrap
+// Sample data as Mailtrap sends it
 $webhookData = [
     "events" => [
         [
@@ -58,32 +58,32 @@ $webhookData = [
             "timestamp" => 1733497400,
             "sending_domain_name" => "examplesender.com",
             "sending_stream" => "transactional"
-            // Geen response_code bij delivery events
+            // Delivery events carry no response_code
         ]
     ]
 ];
 
-echo "Test Mailtrap Webhook Response Code Verwerking\n";
-echo "===============================================\n\n";
+echo "Mailtrap webhook response code handling\n";
+echo "=======================================\n\n";
 
-echo "Voorbeelddata:\n";
+echo "Sample data:\n";
 echo json_encode($webhookData, JSON_PRETTY_PRINT) . "\n\n";
 
-echo "Verwachte resultaten:\n";
+echo "Expected results:\n";
 echo "- receiver@example.com: status_code = 555, reason = '[CS01] Message rejected due to local policy'\n";
 echo "- another@example.com: status_code = 550, reason = '5.5.1 User Unknown'\n";
-echo "- success@example.com: status_code = 200 (default voor delivery), reason = 'Email validated successfully'\n\n";
+echo "- success@example.com: status_code = 200 (default for delivery), reason = 'Email validated successfully'\n\n";
 
-echo "De webhook controller zal nu:\n";
-echo "1. De response_code uit de Mailtrap events extraheren\n";
-echo "2. De response tekst gebruiken als reason (fallback naar event.reason)\n";
-echo "3. Voor delivery events een default status_code van 200 gebruiken\n";
-echo "4. Alle informatie opslaan in de email_validations tabel\n";
-echo "5. MailLog records updaten met de juiste status_code op basis van message_id\n\n";
+echo "The webhook controller will:\n";
+echo "1. Read the response_code from the Mailtrap events\n";
+echo "2. Use the response text as the reason (falling back to event.reason)\n";
+echo "3. Use a default status_code of 200 for delivery events\n";
+echo "4. Store everything in the email_validations table\n";
+echo "5. Update the MailLog row matching the message_id and recipient with the status_code\n\n";
 
 echo "MailLog updates:\n";
 echo "- message_id '1df37d17-0286-4d8b-8edf-bc4ec5be86e6': status_code = 555 (bounce)\n";
 echo "- message_id 'ca7974af-7212-42aa-99fb-cc4742d0658b': status_code = 550 (bounce)\n";
 echo "- message_id 'test-delivery-123': status_code = 200 (delivery success)\n\n";
 
-echo "Test voltooid! Controleer de logs en database voor de juiste verwerking.\n";
+echo "Done. Check the logs and the database for the result.\n";

@@ -3,9 +3,33 @@
 namespace Darvis\Mailtrap\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
+/**
+ * Cached verdict on whether mail to an address can be sent.
+ *
+ * - `valid`: passed the local checks or was confirmed by a delivery, open or click event.
+ * - `invalid`: failed at the recipient (bounce, spam, reject). Recorded, but does not stop sending.
+ * - `blocked`: hard stop; the outgoing mail listener aborts the send with a TransportException.
+ *
+ * @property int $id
+ * @property string|null $email
+ * @property string|null $domain
+ * @property string $status One of the VALID, INVALID or BLOCKED constants.
+ * @property string $reason
+ * @property string|null $status_code
+ * @property Carbon|null $last_checked_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 class EmailValidation extends Model
 {
+    public const VALID = 'valid';
+
+    public const INVALID = 'invalid';
+
+    public const BLOCKED = 'blocked';
+
     protected $table = 'email_validations';
 
     protected $fillable = [
@@ -21,79 +45,193 @@ class EmailValidation extends Model
         'last_checked_at' => 'datetime',
     ];
 
+    /**
+     * Validate an address and cache the verdict.
+     *
+     * Checks the format, then whether the domain has a mail server that resolves
+     * to an IP address. A domain on which another address is already valid skips
+     * the DNS lookups, which run synchronously while a mail is being sent.
+     *
+     * @return string|null Null when the address is valid, otherwise the reason it is not.
+     */
     public static function validateEmail(string $email): ?string
     {
-        // Controleer eerst of er al een record bestaat
-        $existingValidation = static::where('email', $email)->first();
+        $existing = static::where('email', $email)->first();
 
-        if ($existingValidation && ! static::isStale($existingValidation)) {
-            // Een bestaand, nog geldig resultaat: valid geeft null, alles
-            // daarbuiten de eerder vastgelegde foutmelding.
-            return $existingValidation->status === 'valid'
-                ? null
-                : $existingValidation->reason;
+        if ($existing && ! static::isStale($existing)) {
+            return $existing->status === self::VALID ? null : $existing->reason;
         }
 
-        // Geen bestaand record gevonden, voer volledige validatie uit
-        $domain = substr(strrchr($email, '@'), 1);
-
-        // Basic validation
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errorMessage = 'Invalid email format';
-            static::saveValidation($email, 'blocked', $errorMessage, 400);
-
-            return $errorMessage;
+            return static::rejectLocally($email, 'Invalid email format');
         }
 
-        // Check MX records
-        if (! checkdnsrr($domain, 'MX')) {
-            $errorMessage = 'No valid mail server found for domain';
-            static::saveValidation($email, 'blocked', $errorMessage, 400);
+        $domain = static::domainOf($email);
 
-            return $errorMessage;
+        if (static::where('domain', $domain)->where('status', self::VALID)->exists()) {
+            static::saveValidation($email, self::VALID, 'Domain already verified', 200);
+
+            return null;
         }
-        // Controleer of een van de MX records naar een geldig IP-adres verwijst
+
         $mxHosts = [];
-        $mxWeights = [];
-        if (getmxrr($domain, $mxHosts, $mxWeights)) {
-            $validIp = false;
-            foreach ($mxHosts as $host) {
-                $ip = gethostbyname($host);
-                if (filter_var($ip, FILTER_VALIDATE_IP) && $ip !== $host) {
-                    $validIp = true;
-                    break;
-                }
-            }
-            if (! $validIp) {
-                $errorMessage = 'MX record verwijst niet naar geldig IP-adres';
-                static::saveValidation($email, 'blocked', $errorMessage, 400);
 
-                return $errorMessage;
-            }
-        } else {
-            $errorMessage = 'MX records niet gevonden';
-            static::saveValidation($email, 'blocked', $errorMessage, 400);
-
-            return $errorMessage;
+        if (! getmxrr($domain, $mxHosts) || $mxHosts === []) {
+            return static::rejectLocally($email, 'No valid mail server found for domain');
         }
 
-        // If all checks pass, mark as valid
-        static::saveValidation($email, 'valid', 'All checks passed', 200);
+        $resolves = collect($mxHosts)->contains(function (string $host): bool {
+            $ip = gethostbyname($host);
+
+            return $ip !== $host && filter_var($ip, FILTER_VALIDATE_IP) !== false;
+        });
+
+        if (! $resolves) {
+            return static::rejectLocally($email, 'MX record does not resolve to a valid IP address');
+        }
+
+        static::saveValidation($email, self::VALID, 'All checks passed', 200);
 
         return null;
     }
 
     /**
-     * Bepaal of een eerder vastgelegd resultaat opnieuw gecontroleerd moet worden.
+     * Get the domain part of an address, or an empty string when there is none.
+     */
+    public static function domainOf(string $email): string
+    {
+        $at = strrpos($email, '@');
+
+        return $at === false ? '' : strtolower(substr($email, $at + 1));
+    }
+
+    public static function saveValidation(string $email, string $status, string $reason, int|string|null $statusCode): self
+    {
+        return static::updateOrCreate(['email' => $email], [
+            'domain' => static::domainOf($email),
+            'status' => $status,
+            'reason' => $reason,
+            'status_code' => $statusCode === null ? null : (string) $statusCode,
+            'last_checked_at' => now(),
+        ]);
+    }
+
+    /**
+     * Whether sending to this address is blocked.
      *
-     * Alleen lokaal afgeleide 'blocked'-records verlopen. Een DNS-storing of een
-     * tijdelijk ontbrekend MX-record zou een adres anders voorgoed blokkeren.
-     * 'valid' en 'invalid' komen uit Mailtrap-events en zijn niet met een MX
-     * lookup te reproduceren, dus die blijven staan.
+     * Blocking is per address. A blocked address says nothing about the rest of
+     * its domain: a typo, a manual block or a failed API call would otherwise
+     * stop all mail to gmail.com.
+     */
+    public static function isBlocked(string $email): bool
+    {
+        return static::getBlockReason($email) !== null;
+    }
+
+    /**
+     * Get the reason why an address is blocked, or null when it is not.
+     */
+    public static function getBlockReason(string $email): ?string
+    {
+        return static::where('email', $email)
+            ->where('status', self::BLOCKED)
+            ->value('reason');
+    }
+
+    /**
+     * Whether the address, or any other address on its domain, is known to be valid.
+     */
+    public static function isValid(string $email): bool
+    {
+        return static::where('status', self::VALID)
+            ->where(fn ($query) => $query
+                ->where('email', $email)
+                ->orWhere('domain', static::domainOf($email)))
+            ->exists();
+    }
+
+    public static function markAsValid(string $email): self
+    {
+        return static::saveValidation($email, self::VALID, 'Email validated successfully', 200);
+    }
+
+    public static function markAsInvalid(string $email, string $reason, int|string|null $statusCode = null): self
+    {
+        return static::saveValidation($email, self::INVALID, $reason, $statusCode);
+    }
+
+    public static function markAsBlocked(string $email, string $reason, int|string|null $statusCode = null): self
+    {
+        return static::saveValidation($email, self::BLOCKED, $reason, $statusCode);
+    }
+
+    /**
+     * Look up the cached verdict for a list of addresses without validating them.
+     *
+     * @param  array<int, string>  $emails
+     * @return array{valid: int, invalid: int, not_exists: int, total: int, details: array<string, array{status: string, reason: string, last_checked_at: Carbon|null}>}
+     */
+    public static function bulkValidationStatus(array $emails): array
+    {
+        $validations = static::whereIn('email', $emails)->get()->keyBy('email');
+
+        $result = ['valid' => 0, 'invalid' => 0, 'not_exists' => 0, 'total' => count($emails), 'details' => []];
+
+        foreach ($emails as $email) {
+            $validation = $validations->get($email);
+
+            // "invalid" counts both invalid and blocked addresses.
+            $bucket = match ($validation?->status) {
+                null => 'not_exists',
+                self::VALID => 'valid',
+                default => 'invalid',
+            };
+
+            $result[$bucket]++;
+            $result['details'][$email] = [
+                'status' => $validation->status ?? 'not_exists',
+                'reason' => $validation->reason ?? 'Email address not found in database',
+                'last_checked_at' => $validation?->last_checked_at,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Like bulkValidationStatus(), optionally validating addresses that have no verdict yet.
+     *
+     * @param  array<int, string>  $emails
+     * @return array{valid: int, invalid: int, not_exists: int, total: int, details: array<string, array{status: string, reason: string, last_checked_at: Carbon|null}>}
+     */
+    public static function bulkValidationWithCheck(array $emails, bool $validateMissing = false): array
+    {
+        $result = static::bulkValidationStatus($emails);
+
+        if (! $validateMissing || $result['not_exists'] === 0) {
+            return $result;
+        }
+
+        foreach ($result['details'] as $email => $details) {
+            if ($details['status'] === 'not_exists') {
+                static::validateEmail((string) $email);
+            }
+        }
+
+        // validateEmail() stores every verdict, so a second lookup is complete.
+        return static::bulkValidationStatus($emails);
+    }
+
+    /**
+     * Whether a stored verdict should be checked again.
+     *
+     * Only blocked records expire, so a DNS outage or a briefly missing MX record
+     * does not block an address for good. Valid and invalid verdicts come from
+     * Mailtrap events, which an MX lookup cannot reproduce, so they stay.
      */
     protected static function isStale(self $validation): bool
     {
-        if ($validation->status !== 'blocked') {
+        if ($validation->status !== self::BLOCKED) {
             return false;
         }
 
@@ -103,215 +241,17 @@ class EmailValidation extends Model
             return false;
         }
 
-        if ($validation->last_checked_at === null) {
-            return true;
-        }
-
-        return $validation->last_checked_at->addSeconds($cacheDuration)->isPast();
-    }
-
-    public static function saveValidation($email, $status, $reason, $status_code)
-    {
-        $data = [
-            'email' => $email,
-            'domain' => substr(strrchr($email, '@'), 1),
-            'status' => $status,
-            'reason' => $reason,
-            'status_code' => $status_code,
-            'last_checked_at' => now(),
-        ];
-        static::updateOrCreate([
-            'email' => $email,
-        ], $data);
-    }
-
-    public static function isBlocked(string $email): bool
-    {
-        $domain = substr(strrchr($email, '@'), 1);
-
-        return static::where(function ($query) use ($email, $domain) {
-            $query->where('email', $email)
-                ->orWhere('domain', $domain);
-        })->where('status', 'blocked')
-            ->exists();
+        return $validation->last_checked_at === null
+            || $validation->last_checked_at->addSeconds($cacheDuration)->isPast();
     }
 
     /**
-     * Get the reason why an email is blocked
+     * Block an address that failed a local check and return the reason.
      */
-    public static function getBlockReason(string $email): ?string
+    protected static function rejectLocally(string $email, string $reason): string
     {
-        $domain = substr(strrchr($email, '@'), 1);
+        static::saveValidation($email, self::BLOCKED, $reason, 400);
 
-        $validation = static::where(function ($query) use ($email, $domain) {
-            $query->where('email', $email)
-                ->orWhere('domain', $domain);
-        })->where('status', 'blocked')
-            ->first();
-
-        return $validation?->reason;
-    }
-
-    public static function isValid(string $email): bool
-    {
-        $domain = substr(strrchr($email, '@'), 1);
-
-        return static::where(function ($query) use ($email, $domain) {
-            $query->where('email', $email)
-                ->orWhere('domain', $domain);
-        })->where('status', 'valid')
-            ->exists();
-    }
-
-    public static function markAsValid(string $email): self
-    {
-        $domain = substr(strrchr($email, '@'), 1);
-
-        return static::updateOrCreate(
-            ['email' => $email],
-            [
-                'domain' => $domain,
-                'status' => 'valid',
-                'reason' => 'Email validated successfully',
-                'last_checked_at' => now(),
-            ]
-        );
-    }
-
-    public static function markAsInvalid(string $email, string $reason, ?string $statusCode = null): self
-    {
-        $domain = substr(strrchr($email, '@'), 1);
-
-        return static::updateOrCreate(
-            ['email' => $email],
-            [
-                'domain' => $domain,
-                'status' => 'invalid',
-                'reason' => $reason,
-                'status_code' => $statusCode,
-                'last_checked_at' => now(),
-            ]
-        );
-    }
-
-    public static function markAsBlocked(string $email, string $reason, ?string $statusCode = null): self
-    {
-        $domain = substr(strrchr($email, '@'), 1);
-
-        return static::updateOrCreate(
-            ['email' => $email],
-            [
-                'domain' => $domain,
-                'status' => 'blocked',
-                'reason' => $reason,
-                'status_code' => $statusCode,
-                'last_checked_at' => now(),
-            ]
-        );
-    }
-
-    /**
-     * Bulk validatie van mailadressen
-     *
-     * @param  array  $emails  Array van mailadressen om te controleren
-     * @return array Resultaat met telling van valid, invalid/blocked en niet bestaande mailadressen
-     */
-    public static function bulkValidationStatus(array $emails): array
-    {
-        $result = [
-            'valid' => 0,
-            'invalid' => 0,
-            'not_exists' => 0,
-            'total' => count($emails),
-            'details' => [],
-        ];
-
-        // Haal alle bestaande validaties op in één query
-        $existingValidations = static::whereIn('email', $emails)
-            ->get()
-            ->keyBy('email');
-
-        foreach ($emails as $email) {
-            if (isset($existingValidations[$email])) {
-                $validation = $existingValidations[$email];
-                $status = $validation->status;
-
-                if ($status === 'valid') {
-                    $result['valid']++;
-                    $result['details'][$email] = [
-                        'status' => 'valid',
-                        'reason' => $validation->reason,
-                        'last_checked_at' => $validation->last_checked_at,
-                    ];
-                } else {
-                    // Status is 'blocked' of 'invalid'
-                    $result['invalid']++;
-                    $result['details'][$email] = [
-                        'status' => $status,
-                        'reason' => $validation->reason,
-                        'last_checked_at' => $validation->last_checked_at,
-                    ];
-                }
-            } else {
-                // Mailadres bestaat niet in database
-                $result['not_exists']++;
-                $result['details'][$email] = [
-                    'status' => 'not_exists',
-                    'reason' => 'Mailadres niet gevonden in database',
-                    'last_checked_at' => null,
-                ];
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Bulk validatie met optie om ontbrekende mailadressen direct te valideren
-     *
-     * @param  array  $emails  Array van mailadressen om te controleren
-     * @param  bool  $validateMissing  Of ontbrekende mailadressen direct gevalideerd moeten worden
-     * @return array Resultaat met telling van valid, invalid/blocked en niet bestaande mailadressen
-     */
-    public static function bulkValidationWithCheck(array $emails, bool $validateMissing = false): array
-    {
-        $result = static::bulkValidationStatus($emails);
-
-        if ($validateMissing && $result['not_exists'] > 0) {
-            // Valideer alle mailadressen die niet bestaan
-            $missingEmails = [];
-            foreach ($result['details'] as $email => $details) {
-                if ($details['status'] === 'not_exists') {
-                    $missingEmails[] = $email;
-                }
-            }
-
-            // Valideer elk ontbrekend mailadres
-            foreach ($missingEmails as $email) {
-                $isValid = static::validateEmail($email);
-
-                // Update het resultaat
-                $result['not_exists']--;
-                if ($isValid) {
-                    $result['valid']++;
-                    $result['details'][$email] = [
-                        'status' => 'valid',
-                        'reason' => 'All checks passed',
-                        'last_checked_at' => now(),
-                    ];
-                } else {
-                    $result['invalid']++;
-                    // Haal de nieuwe validatie op voor de details
-                    $validation = static::where('email', $email)->first();
-                    $result['details'][$email] = [
-                        'status' => $validation->status,
-                        'reason' => $validation->reason,
-                        'last_checked_at' => $validation->last_checked_at,
-                    ];
-                }
-            }
-        }
-
-        return $result;
+        return $reason;
     }
 }

@@ -23,6 +23,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   secret, and a stale config cache) and lets you swap the token or replace the webhook.
 - `api.account_url` config (`MAILTRAP_ACCOUNT_API_URL`, default `https://mailtrap.io`)
   for the account API used by these commands.
+- **Laravel Boost resources.** A guideline in `resources/boost/guidelines/core.blade.php`
+  and a `mailtrap-development` skill, picked up by `boost:install` and
+  `boost:update --discover`.
+- `MailLog` scopes `pending()` and `blocked()`, the constants `MailLog::STATUS_SENT` and
+  `STATUS_BLOCKED`, and a `related()` morph relation that resolves the model named in the
+  `X-Mail-Model` / `X-Mail-Model-ID` headers.
+- `MailLog` is `MassPrunable`: `php artisan model:prune --model="Darvis\Mailtrap\Models\MailLog"`
+  removes logs older than `logging.cleanup_after_days`, a setting that only the inbox
+  cleanup button used before.
+- `EmailValidation::VALID`, `INVALID` and `BLOCKED` constants and `EmailValidation::domainOf()`.
+- `@property` docblocks on both models and a `suggest` for Livewire and Flux in `composer.json`.
+
+### Fixed
+
+- **One blocked address no longer blocks its whole domain.** `isBlocked()` also matched
+  on the domain, so a single address with a bad format, a manual `markAsBlocked()` or a
+  failed API call stopped all mail to, say, gmail.com — for good, because only the
+  original address was ever re-checked. Blocking is now per address.
+- **Cc and Bcc recipients are validated and logged.** Only To was checked, so a blocked
+  address in Bcc was still sent to.
+- **`bulkValidationWithCheck()` counted failed addresses as valid.** `validateEmail()`
+  returns `null` for a valid address, and the check was inverted.
+- **Webhook events for different mails to the same address are all processed.** The
+  batch skipped every event after the first for an address, so a delivery that followed
+  a bounce in the same batch never updated its log. Only identical events (same
+  `event_id`) are skipped now.
+- **Webhook events update only the recipient they are about.** Recipients of one mail
+  share its message id, so a bounce for one recipient also marked the others as bounced.
+- **Webhook events store the reason on an existing log.** Only the status code was
+  updated, so the bounce message was lost.
+- **A leftover unique index on `message_id` no longer breaks multi-recipient mail on
+  SQLite and PostgreSQL.** The duplicate was recognised by MySQL's error text only; it
+  now catches `UniqueConstraintViolationException`.
+- **Mail with a `Sender` but no `From` header** no longer crashes the logging listener.
+- A known-valid domain no longer lets a malformed address skip the format check; the
+  listener now always calls `validateEmail()`, which still skips the DNS lookups for
+  such a domain.
+
+### Changed
+
+- **Everything is in English.** Validation reasons, webhook responses and log messages
+  (for example `MX record does not resolve to a valid IP address` and `Webhook processed`),
+  the `mailtrap:test` output, and the inbox UI labels, notices and test mail. Code
+  comments and the config file were translated too. Numbers in the inbox stats use
+  PHP's default `number_format()` (`1,234` instead of `1.234`).
+- `markAsValid()` records status code `200`.
+
+### Deprecated
+
+- `MailtrapService` and the `app('mailtrap')` alias. They call a Mailtrap validation
+  endpoint that does not exist, and nothing in the package uses them. Use
+  `EmailValidation::validateEmail()`. Removed in 2.0.
+- The config keys `api.base_url`, `validation.retry_attempts`, `rate_limiting.*` and
+  `development.*`. The package never read them. Removed in 2.0.
 
 ## [1.1.0] - 2026-09-10
 

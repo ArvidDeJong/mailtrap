@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Controleer of de tabel al bestaat
+        // Skip when the table already exists
         if (!Schema::hasTable('mail_logs')) {
             Schema::create('mail_logs', function (Blueprint $table) {
                 $table->id();

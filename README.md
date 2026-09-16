@@ -51,7 +51,6 @@ For complete documentation and extensive examples:
 - ✅ **Automatic Registration** - Laravel package discovery
 - ✅ **Event Listeners** - Automatic validation via Laravel mail events
 - ✅ **Mailer-independent** - Logging & validation work with any transport (Mailtrap, Microsoft Graph, SES, …)
-- ✅ **Rate Limiting** - Built-in API rate limiting
 - ✅ **Webhook Support** - Mailtrap callback support
 
 ### 📊 **Monitoring & Logging**
@@ -157,14 +156,55 @@ MAILTRAP_UI_PER_PAGE=25
 ### Basic Usage
 
 ```php
-// Via the Mailtrap service
-$mailtrap = app(Darvis\Mailtrap\Services\MailtrapService::class);
+use Darvis\Mailtrap\Models\EmailValidation;
 
-// Or via the alias
-$mailtrap = app('mailtrap');
+$error = EmailValidation::validateEmail('test@example.com'); // null when valid
 
-// Email validation
-$isValid = $mailtrap->validateEmail('test@example.com');
+// Stop all mail to one address. Other addresses on the domain are not affected.
+EmailValidation::markAsBlocked('complainer@example.com', 'Spam complaint');
+```
+
+> **Deprecated:** `MailtrapService` and `app('mailtrap')` call a Mailtrap validation
+> endpoint that does not exist, so `validateEmail()` there cannot succeed. They are
+> removed in 2.0. Use `EmailValidation::validateEmail()` instead.
+
+### Blocking
+
+Before a mail is sent, every To, Cc and Bcc address is checked. A `blocked` address
+aborts the whole send with a `Symfony\Component\Mailer\Exception\TransportException`
+(set `MAILTRAP_BLOCK_INVALID_EMAILS=false` to send anyway and only log the reason).
+Blocking is per address: a typo or a manual block never stops mail to the rest of the
+domain. `invalid` (from bounce, spam and reject events) is recorded but does not block.
+
+### Mail logs
+
+Tag a Mailable with headers to link its log to a model:
+
+```php
+public function headers(): \Illuminate\Mail\Mailables\Headers
+{
+    return new \Illuminate\Mail\Mailables\Headers(text: [
+        'X-Mail-Type' => 'invoice',
+        'X-Mail-Model' => Invoice::class,
+        'X-Mail-Model-ID' => (string) $this->invoice->id,
+    ]);
+}
+```
+
+```php
+use Darvis\Mailtrap\Models\MailLog;
+
+MailLog::forModel(Invoice::class, $invoice->id)->failed()->get();
+MailLog::pending()->count();   // also: successful(), blocked()
+$log->related;                 // the Invoice
+```
+
+Logs older than `MAILTRAP_CLEANUP_AFTER_DAYS` are removed by Laravel's pruning. Package
+models are not discovered automatically, so schedule it explicitly:
+
+```php
+// routes/console.php
+Schedule::command('model:prune', ['--model' => [\Darvis\Mailtrap\Models\MailLog::class]])->daily();
 ```
 
 ### Laravel Collections Filtering
@@ -314,6 +354,13 @@ MAILTRAP_WEBHOOK_VERIFY_SIGNATURE=false
 
 > **Why this matters:** a `bounce` event marks an address invalid. Left unverified,
 > anyone who knows the URL can post events for arbitrary addresses.
+
+## 🤖 Laravel Boost
+
+The package ships [Laravel Boost](https://laravel.com/docs/boost) resources: a guideline
+(`resources/boost/guidelines/core.blade.php`) and a `mailtrap-development` skill. Run
+`php artisan boost:install`, or `php artisan boost:update --discover` in a project that
+already uses Boost, to give your AI agent the package's conventions.
 
 ## 🛠️ Development
 

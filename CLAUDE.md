@@ -31,14 +31,14 @@ Two service providers, layered:
 
 ### Outgoing mail flow (the critical path)
 
-On `MessageSending`, for each recipient:
+On `MessageSending`, for each To, Cc and Bcc recipient:
 
-1. Run `EmailValidation::validateEmail()` if no prior result exists (format → MX → MX-resolves-to-IP).
-2. If `EmailValidation::isBlocked()` (matches by email **or** by domain), log a 550 entry via `MailLog::createWithSource()` and throw `Symfony\Component\Mailer\Exception\TransportException` — this aborts the send.
-3. Otherwise overwrite any incoming `X-Message-ID` header with a fresh UUID and create a `MailLog` row with `status_code = null`. On `MessageSent`, the row is updated to `200`.
-4. Optional headers `X-Mail-Type`, `X-Mail-Model`, `X-Mail-Model-ID` are copied into the log for cross-referencing back to the calling domain object.
+1. Run `EmailValidation::validateEmail()` (skipped when `validation.enabled` is false). It returns a cached verdict when there is one that has not gone stale. Otherwise it checks the format, then skips DNS if another address on the domain is already valid, and otherwise checks for an MX record that resolves to an IP.
+2. If `EmailValidation::getBlockReason()` returns a reason, log a 550 entry via `MailLog::createWithSource()` and throw `Symfony\Component\Mailer\Exception\TransportException`. That aborts the send.
+3. Otherwise reuse or create the `X-Message-ID` header (one id shared by all recipients) and create a `MailLog` row with `status_code = null`. On `MessageSent`, the rows for that id are updated to `200`.
+4. Optional headers `X-Mail-Type`, `X-Mail-Model`, `X-Mail-Model-ID` are copied into the log; `MailLog::related()` resolves them as a morph relation.
 
-Implication: **blocking is by-domain, not just by-email** (see `EmailValidation::isBlocked` / `isValid` — both `orWhere('domain', ...)`). One blocked address poisons the whole domain for sending. Keep this in mind when marking records.
+**Blocking is per address, never per domain.** Before 1.2.0 `isBlocked` also matched the domain, so one typo or manual block stopped mail to a whole provider. Only `isValid` looks at the domain, and only as a shortcut to skip DNS lookups.
 
 ### Webhook flow
 
@@ -49,7 +49,7 @@ Implication: **blocking is by-domain, not just by-email** (see `EmailValidation:
 - `spam` → `markAsInvalid()` (default 400)
 - `reject` → `markAsInvalid()` (default 450)
 
-For every handled event, `upsertMailLogFromWebhook()` either updates the existing `MailLog` row by `message_id` or creates a new one (the local `MessageSending` path may not have run, e.g. when Mailtrap is the only source of truth). The endpoint always returns 200 to keep Mailtrap from retrying — failures are swallowed and counted as `skipped`.
+The event-to-verdict mapping lives in the `EVENTS` constant of the controller. For every handled event, `apply()` updates the `MailLog` row matching `message_id` **and** recipient (recipients of one mail share the id), or creates a new one (the local `MessageSending` path may not have run, e.g. when Mailtrap is the only source of truth). The endpoint always returns 200 to keep Mailtrap from retrying — failures are swallowed and counted as `skipped`.
 
 Webhook signature verification runs in [VerifyMailtrapWebhookSignature](src/Http/Middleware/VerifyMailtrapWebhookSignature.php), attached as route middleware in the service provider — not inline in the controller. It checks the HMAC-SHA256 of the **raw** request body against the `Mailtrap-Signature` header and **fails closed**: with `webhook.verify_signature` on and no `webhook.secret`, every call is rejected with 403. Never re-encode the body before hashing; Mailtrap signs the bytes as sent. The route itself is only registered when `webhook.enabled` is true.
 
@@ -65,6 +65,8 @@ The secret cannot be chosen locally: Mailtrap generates it and returns it only i
 
 This distinction matters when triaging "why isn't this email going out" vs "why are we still hammering a dead address."
 
+Use the constants (`EmailValidation::VALID/INVALID/BLOCKED`, `MailLog::STATUS_SENT/STATUS_BLOCKED`) and the `MailLog` scopes (`successful`, `failed`, `pending`, `blocked`) instead of string literals. Logging to the Laravel log always goes through `Support\PackageLog`, which honours `logging.log_to_laravel`.
+
 ### `MailLog::createWithSource()`
 
 Captures `debug_backtrace` to record `source_file` and `source_line` of the caller (relative to `base_path()`). Auto-generates `message_id` with a prefix based on `status_code` (`BLOCKED_`, `VALIDATION_ERROR_`, `TRANSPORT_ERROR_`, `ERROR_`) when none is provided — used for logging mails that were stopped before a real Message-ID existed. Plain `MailLog::create()` does not do any of this.
@@ -75,7 +77,10 @@ Captures `debug_backtrace` to record `source_file` and `source_line` of the call
 
 ## Conventions specific to this package
 
+- `resources/boost/` holds the Laravel Boost guideline and the `mailtrap-development` skill that host apps receive. Update them when public behaviour, commands or config change.
+- Keep the public API compatible within 1.x. Don't add return types to existing public methods that host apps may override, and don't change `$casts` into `casts()`. Deprecate first and remove in 2.0.
+
 - Config file stays as `config/manta_mailtrap.php` with that exact name (do not rename to `mailtrap.php`).
-- Inline comments and log messages in the older files are in Dutch; newer code is English. README and CHANGELOG are English. Prefer English for new code.
+- Everything is in English: comments, log and exception messages, command output and the inbox UI. README and CHANGELOG too.
 - Don't introduce Doctrine DBAL — Laravel 11+ compatibility depends on its absence. Use the native schema builder (`Schema::hasColumn`, `Schema::hasTable`, `Schema::getIndexes`) for schema checks. Never reach for driver-specific SQL such as `SHOW INDEX`: host apps run their tests on SQLite, where it is a syntax error.
 - The webhook controller extends `Illuminate\Routing\Controller` (not an app-level base controller) so the package works without the host app's `App\Http\Controllers\Controller`.

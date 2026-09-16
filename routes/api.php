@@ -8,8 +8,8 @@ use Darvis\Mailtrap\Http\Controllers\MailtrapWebhookController;
 | Mailtrap Package API Routes
 |--------------------------------------------------------------------------
 |
-| Deze API routes worden automatisch geladen door het Mailtrap package.
-| Ze bevatten de webhook endpoints voor externe Mailtrap calls.
+| Loaded by the service provider under the "api" prefix, only when
+| webhook.enabled is true. The signature middleware is attached there.
 |
 */
 
