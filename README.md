@@ -2,8 +2,10 @@
 
 A powerful Laravel package for Mailtrap integration: email validation, automatic logging of outgoing mail, a Mailtrap-style inbox UI and a CLI health-check command.
 
-[![Laravel](https://img.shields.io/badge/Laravel-12-red.svg)](https://laravel.com)
-[![PHP](https://img.shields.io/badge/PHP-8.1+-blue.svg)](https://php.net)
+[![Latest Version](https://img.shields.io/packagist/v/darvis/mailtrap.svg)](https://packagist.org/packages/darvis/mailtrap)
+[![Tests](https://github.com/ArvidDeJong/mailtrap/actions/workflows/tests.yml/badge.svg)](https://github.com/ArvidDeJong/mailtrap/actions/workflows/tests.yml)
+[![Laravel](https://img.shields.io/badge/Laravel-11%20%7C%2012%20%7C%2013-red.svg)](https://laravel.com)
+[![PHP](https://img.shields.io/badge/PHP-8.2+-blue.svg)](https://php.net)
 
 ## 🚀 Quick Start
 
@@ -80,18 +82,31 @@ composer require darvis/mailtrap
 php artisan mailtrap:install
 ```
 
-`mailtrap:install` runs the migrations, asks for your Mailtrap API token, creates the
-webhook in Mailtrap and writes its signing secret to `.env`. Run it on the server the
-webhook points at. Non-interactive, e.g. in a deploy script:
+`mailtrap:install` is a setup wizard. It walks you through eight steps and explains each
+one before it asks anything:
+
+1. **Check the basics**: `.env`, `APP_URL`, the database connection and the current mailer
+2. **Database tables**: runs the migrations
+3. **Mailtrap API token**: explains where to create one and verifies it with Mailtrap
+4. **Sending mail**: fills in the Mailtrap SMTP settings and the sender address, or keeps your own mailer
+5. **Webhook**: creates the webhook and stores its signing secret. On a local site it tells you to run the wizard on the live server instead.
+6. **Address validation**: check and block, check and only log, or off
+7. **Inbox page**: who may open it, which layout it uses and the Tailwind `@source` line
+8. **Test mail**: sends one through `mailtrap:test`
+
+Every answer is written to `.env` straight away, and a summary at the end lists what is
+still left to do. `.env` is not in git, so run the wizard on every server.
+
+Without a terminal, e.g. in a deploy script, it asks nothing and only does what the flags say:
 
 ```bash
 php artisan mailtrap:install --webhook --no-interaction          # uses MAILTRAP_API_TOKEN
 php artisan mailtrap:install --without-webhook --no-interaction  # not sending through Mailtrap
 ```
 
-The command is safe to re-run on a site that is already configured: it shows the current
-token, endpoint and secret state, lets you keep or replace the API token, and offers to
-replace the existing webhook (Mailtrap never shows an old secret again). Non-interactive:
+The wizard is safe to re-run on a site that is already configured: it preselects the
+current settings, lets you keep or replace the API token, and offers to replace the
+existing webhook (Mailtrap never shows an old secret again). Non-interactive:
 
 ```bash
 php artisan mailtrap:install --webhook --replace --token=new_token --no-interaction
@@ -207,6 +222,28 @@ models are not discovered automatically, so schedule it explicitly:
 Schedule::command('model:prune', ['--model' => [\Darvis\Mailtrap\Models\MailLog::class]])->daily();
 ```
 
+### Events
+
+Listen to these events to react in your own application:
+
+| Event | When | Properties |
+| --- | --- | --- |
+| `Darvis\Mailtrap\Events\MailBlocked` | Just before a send to a blocked address is aborted | `email`, `reason`, `message`, `mailLog` |
+| `Darvis\Mailtrap\Events\MailtrapEventReceived` | For every signed webhook event, also the ones the package ignores | `type`, `email`, `payload`, `mailLog` |
+
+```php
+use Darvis\Mailtrap\Events\MailtrapEventReceived;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(function (MailtrapEventReceived $event): void {
+    if ($event->type === 'unsubscribe') {
+        User::where('email', $event->email)->update(['newsletter' => false]);
+    }
+});
+```
+
+A listener that throws is logged (with `MAILTRAP_LOG_TO_LARAVEL=true`) and does not stop the rest of the webhook batch.
+
 ### Laravel Collections Filtering
 
 ```php
@@ -233,7 +270,7 @@ $grouped = collect($result['details'])
 
 A Mailtrap-style inbox to inspect outgoing mail, built with Livewire and Flux UI.
 
-> **Requirements:** the host application must have `livewire/livewire` and `livewire/flux` installed. When Livewire is absent (or `MAILTRAP_UI_ENABLED=false`) the UI registration is skipped automatically — the rest of the package keeps working.
+> **Requirements:** the host application must have `livewire/livewire` (^3.7.4 or ^4.0) and `livewire/flux` (^2.11, the free edition is enough) installed. When Livewire is absent (or `MAILTRAP_UI_ENABLED=false`) the UI registration is skipped automatically — the rest of the package keeps working.
 
 Once enabled, the inbox lives at the configured route (default `/mailtrap`) and offers:
 
@@ -312,6 +349,10 @@ The package registers a webhook endpoint:
 Set `MAILTRAP_WEBHOOK_ENABLED=false` to not register the route at all — recommended
 when you send through another transport, since delivery events only come from Mailtrap.
 
+Each outgoing mail carries its log id to Mailtrap as the custom variable `x_message_id`
+(header `X-MT-Custom-Variables`, merged with any variables you set yourself). Mailtrap
+returns it in every webhook event, so the event updates the right log row.
+
 #### Signature verification
 
 Mailtrap signs every webhook with an HMAC-SHA256 of the raw request body, hex encoded,
@@ -364,12 +405,13 @@ already uses Boost, to give your AI agent the package's conventions.
 
 ## 🛠️ Development
 
-This package is actively developed with focus on:
-- Performance optimization
-- Comprehensive email validation
-- Automatic blocking of invalid emails
-- Comprehensive mail logging
-- Inbox UI and CLI tooling for inspecting and testing outgoing mail
+```bash
+composer test      # Pest
+composer lint      # Pint, check only (composer format to fix)
+composer analyse   # Larastan
+```
+
+GitHub Actions runs the tests on PHP 8.2–8.4 against Laravel 11, 12 and 13, with both the lowest and the latest allowed dependencies.
 
 ## License
 

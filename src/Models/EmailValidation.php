@@ -30,6 +30,19 @@ class EmailValidation extends Model
 
     public const BLOCKED = 'blocked';
 
+    /**
+     * Reasons recorded by the local format and DNS checks. Only blocks with one
+     * of these reasons expire; a block set through markAsBlocked() stays until
+     * it is lifted. The Dutch reasons were written by versions before 1.2.0.
+     */
+    public const LOCAL_CHECK_REASONS = [
+        'Invalid email format',
+        'No valid mail server found for domain',
+        'MX record does not resolve to a valid IP address',
+        'MX record verwijst niet naar geldig IP-adres',
+        'MX records niet gevonden',
+    ];
+
     protected $table = 'email_validations';
 
     protected $fillable = [
@@ -63,7 +76,7 @@ class EmailValidation extends Model
         }
 
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return static::rejectLocally($email, 'Invalid email format');
+            return static::rejectLocally($email, self::LOCAL_CHECK_REASONS[0]);
         }
 
         $domain = static::domainOf($email);
@@ -77,7 +90,7 @@ class EmailValidation extends Model
         $mxHosts = [];
 
         if (! getmxrr($domain, $mxHosts) || $mxHosts === []) {
-            return static::rejectLocally($email, 'No valid mail server found for domain');
+            return static::rejectLocally($email, self::LOCAL_CHECK_REASONS[1]);
         }
 
         $resolves = collect($mxHosts)->contains(function (string $host): bool {
@@ -87,7 +100,7 @@ class EmailValidation extends Model
         });
 
         if (! $resolves) {
-            return static::rejectLocally($email, 'MX record does not resolve to a valid IP address');
+            return static::rejectLocally($email, self::LOCAL_CHECK_REASONS[2]);
         }
 
         static::saveValidation($email, self::VALID, 'All checks passed', 200);
@@ -225,13 +238,14 @@ class EmailValidation extends Model
     /**
      * Whether a stored verdict should be checked again.
      *
-     * Only blocked records expire, so a DNS outage or a briefly missing MX record
-     * does not block an address for good. Valid and invalid verdicts come from
-     * Mailtrap events, which an MX lookup cannot reproduce, so they stay.
+     * Only blocks from the local checks expire, so a DNS outage or a briefly
+     * missing MX record does not block an address for good. Manual blocks and
+     * the valid and invalid verdicts from Mailtrap events cannot be reproduced
+     * by an MX lookup, so they stay.
      */
     protected static function isStale(self $validation): bool
     {
-        if ($validation->status !== self::BLOCKED) {
+        if ($validation->status !== self::BLOCKED || ! in_array($validation->reason, self::LOCAL_CHECK_REASONS, true)) {
             return false;
         }
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Package overview
 
-`darvis/mailtrap` is a Laravel package (PHP 8.1+, Laravel 11/12/13) providing Mailtrap integration with three main responsibilities: email address validation, outgoing mail logging, and webhook ingestion of Mailtrap delivery events. It is consumed by host Laravel apps via Composer; this repo only contains the library itself.
+`darvis/mailtrap` is a Laravel package (PHP 8.2+, Laravel 11/12/13) providing Mailtrap integration with three main responsibilities: email address validation, outgoing mail logging, and webhook ingestion of Mailtrap delivery events. It is consumed by host Laravel apps via Composer; this repo only contains the library itself.
 
 - Namespace: `Darvis\Mailtrap\` → `src/`
 - Service provider auto-registered via `extra.laravel.providers` in [composer.json](composer.json)
@@ -18,7 +18,11 @@ composer test                 # Run the full Pest suite (alias for "pest tests")
 vendor/bin/pest                # Same, invoked directly
 vendor/bin/pest tests/MailtrapWebhookControllerTest.php   # Run one test file
 vendor/bin/pest --filter "creates mail log"               # Run a single test by name
+composer lint                 # Pint (check only); composer format fixes
+composer analyse              # Larastan, level 5
 ```
+
+CI (`.github/workflows/tests.yml`) runs PHP 8.2–8.4 × Laravel 11/12/13 × lowest/stable. It turns off Composer's advisory blocking, because every Laravel 11 release has an open advisory. The inbox needs Flux ≥ 2.11 (free `card`/`table`); the lowest-dependency legs catch that kind of floor. The test app loads the Livewire and Flux providers; `LivewireNotLoadedTest` covers a host without them.
 
 Tests use Orchestra Testbench with an in-memory SQLite database; migrations are loaded manually in [TestCase::runPackageMigrations()](tests/TestCase.php) (not via `loadMigrationsFrom`), so **when adding a new migration, also add it to that array** or Pest tests against it will fail with "no such table" — and, worse, the migration itself goes untested (this is how the MySQL-only `SHOW INDEX` in `000003` survived until 1.0.15).
 
@@ -64,6 +68,10 @@ The secret cannot be chosen locally: Mailtrap generates it and returns it only i
 - `blocked` — hard stop on send. Set by local validation failures (bad format, no MX) and by `MailtrapService::handleFailure()` on API/transport errors. Use `markAsBlocked` when you actually want to halt sending.
 
 This distinction matters when triaging "why isn't this email going out" vs "why are we still hammering a dead address."
+
+Only blocks whose reason is in `EmailValidation::LOCAL_CHECK_REASONS` expire (`isStale`); manual `markAsBlocked()` blocks are permanent. Pre-1.2.0 Dutch reasons are in that list on purpose, because existing rows still carry them.
+
+Host apps hook in through `Events\MailBlocked` (dispatched before the TransportException) and `Events\MailtrapEventReceived` (every webhook event, including types the controller ignores; listener exceptions are caught). The webhook finds a log by the `x_message_id` custom variable that `MailServiceProvider` adds to `X-MT-Custom-Variables` (merged, and left alone above Mailtrap's 1000-byte limit), with Mailtrap's `message_id` as fallback.
 
 Use the constants (`EmailValidation::VALID/INVALID/BLOCKED`, `MailLog::STATUS_SENT/STATUS_BLOCKED`) and the `MailLog` scopes (`successful`, `failed`, `pending`, `blocked`) instead of string literals. Logging to the Laravel log always goes through `Support\PackageLog`, which honours `logging.log_to_laravel`.
 

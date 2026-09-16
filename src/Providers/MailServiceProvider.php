@@ -2,6 +2,7 @@
 
 namespace Darvis\Mailtrap\Providers;
 
+use Darvis\Mailtrap\Events\MailBlocked;
 use Darvis\Mailtrap\Models\EmailValidation;
 use Darvis\Mailtrap\Models\MailLog;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -12,6 +13,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Header\Headers;
 
 class MailServiceProvider extends ServiceProvider
 {
@@ -28,6 +30,8 @@ class MailServiceProvider extends ServiceProvider
             $messageId = $header('X-Message-ID') ?? Str::uuid()->toString();
             $headers->remove('X-Message-ID');
             $headers->addTextHeader('X-Message-ID', $messageId);
+
+            self::addMailtrapCustomVariable($headers, $messageId);
 
             $modelId = $header('X-Mail-Model-ID');
 
@@ -60,13 +64,15 @@ class MailServiceProvider extends ServiceProvider
                 $blockReason = EmailValidation::getBlockReason($email);
 
                 if ($blockReason !== null && $blockInvalid) {
-                    if ($logFailed) {
-                        MailLog::createWithSource($logRow + [
+                    $mailLog = $logFailed
+                        ? MailLog::createWithSource($logRow + [
                             'recipient' => $email,
                             'status_code' => MailLog::STATUS_BLOCKED,
                             'error_message' => $blockReason,
-                        ]);
-                    }
+                        ])
+                        : null;
+
+                    MailBlocked::dispatch($email, $blockReason, $message, $mailLog);
 
                     throw new TransportException("Email address {$email} is blocked: {$blockReason}");
                 }
@@ -108,5 +114,34 @@ class MailServiceProvider extends ServiceProvider
                 ->pending()
                 ->update(['status_code' => MailLog::STATUS_SENT]);
         });
+    }
+
+    /**
+     * Send the log's message id along as a Mailtrap custom variable.
+     *
+     * Mailtrap returns custom variables in its webhook events, which lets the
+     * webhook find this mail's log even when Mailtrap reports its own message
+     * id. Variables the application already set are kept. Mailtrap ignores the
+     * whole header above 1000 bytes, so it is left alone rather than broken.
+     *
+     * @see https://docs.mailtrap.io/email-api-smtp/advanced/custom-variables
+     */
+    private static function addMailtrapCustomVariable(Headers $headers, string $messageId): void
+    {
+        $existing = $headers->get(MailLog::CUSTOM_VARIABLES_HEADER)?->getBodyAsString();
+        $variables = $existing === null ? [] : json_decode($existing, true);
+
+        if (! is_array($variables)) {
+            return;
+        }
+
+        $json = json_encode([...$variables, MailLog::CUSTOM_VARIABLE => $messageId], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if ($json === false || strlen($json) > 1000) {
+            return;
+        }
+
+        $headers->remove(MailLog::CUSTOM_VARIABLES_HEADER);
+        $headers->addTextHeader(MailLog::CUSTOM_VARIABLES_HEADER, $json);
     }
 }

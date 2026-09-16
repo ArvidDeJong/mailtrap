@@ -95,8 +95,10 @@ class MailtrapServiceProvider extends ServiceProvider
     /**
      * Register the Livewire/Flux inbox component and its route.
      *
-     * The UI is optional and only registered when Livewire is installed in
-     * the host application and the UI is enabled in the config.
+     * The UI is optional and only registered when Livewire is loaded in the
+     * host application and the UI is enabled in the config. Checking the
+     * container rather than class_exists() also covers an app that has the
+     * Livewire package installed but its provider excluded from discovery.
      */
     protected function registerInboxUi(): void
     {
@@ -104,7 +106,7 @@ class MailtrapServiceProvider extends ServiceProvider
             return;
         }
 
-        if (! class_exists(Livewire::class)) {
+        if (! class_exists(Livewire::class) || ! $this->app->bound('livewire')) {
             return;
         }
 

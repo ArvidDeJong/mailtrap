@@ -46,6 +46,14 @@ class MailLog extends Model
 
     public const STATUS_BLOCKED = '550';
 
+    /**
+     * Header through which Mailtrap accepts custom variables, and the variable
+     * that carries the log's message id back in webhook events.
+     */
+    public const CUSTOM_VARIABLES_HEADER = 'X-MT-Custom-Variables';
+
+    public const CUSTOM_VARIABLE = 'x_message_id';
+
     protected $fillable = [
         'message_id',
         'sender',
@@ -98,7 +106,7 @@ class MailLog extends Model
             $data['message_id'] = $prefix.uniqid();
         }
 
-        return static::create($data);
+        return static::query()->create($data);
     }
 
     /**
@@ -114,7 +122,7 @@ class MailLog extends Model
     /**
      * Logs older than logging.cleanup_after_days, for `php artisan model:prune`.
      *
-     * @return Builder<static>
+     * @return Builder<self>
      */
     public function prunable(): Builder
     {

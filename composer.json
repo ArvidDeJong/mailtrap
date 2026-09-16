@@ -25,18 +25,22 @@
         "source": "https://github.com/ArvidDeJong/mailtrap"
     },
     "require": {
-        "php": "^8.1",
+        "php": "^8.2",
         "laravel/framework": "^11.0|^12.0|^13.0"
     },
     "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.0",
+        "livewire/flux": "^2.11",
+        "livewire/livewire": "^3.7.4|^4.0",
         "orchestra/testbench": "^9.0|^10.0|^11.0",
         "pestphp/pest": "^3.0|^4.0",
         "pestphp/pest-plugin-laravel": "^3.0|^4.0",
         "phpunit/phpunit": "^11.0|^12.0|^13.0"
     },
     "suggest": {
-        "livewire/livewire": "Required for the inbox UI.",
-        "livewire/flux": "Required for the inbox UI components."
+        "livewire/livewire": "Required for the inbox UI (^3.7.4 or ^4.0).",
+        "livewire/flux": "Required for the inbox UI (^2.11, the free edition is enough)."
     },
     "autoload": {
         "psr-4": {
@@ -63,6 +67,9 @@
         }
     },
     "scripts": {
-        "test": "pest tests"
+        "test": "pest tests",
+        "lint": "pint --test",
+        "format": "pint",
+        "analyse": "phpstan analyse --memory-limit=1G"
     }
 }

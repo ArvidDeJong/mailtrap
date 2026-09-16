@@ -52,7 +52,7 @@ it('delivers to a flagged address when hard blocking is switched off', function 
 it('re-checks a blocked address once the cache duration has passed', function (): void {
     config()->set('manta_mailtrap.validation.cache_duration', 60);
 
-    EmailValidation::saveValidation('not valid@example.org', 'blocked', 'Stale reason', 400);
+    EmailValidation::saveValidation('not valid@example.org', 'blocked', 'No valid mail server found for domain', 400);
     EmailValidation::where('email', 'not valid@example.org')
         ->update(['last_checked_at' => now()->subMinutes(5)]);
 
@@ -91,4 +91,25 @@ it('does not re-derive an invalid address reported by a webhook', function (): v
         ->update(['last_checked_at' => now()->subYear()]);
 
     expect(EmailValidation::validateEmail('bounced@example.org'))->toBe('Hard bounce');
+});
+
+it('never expires a manual block, whatever the cache duration', function (): void {
+    config()->set('manta_mailtrap.validation.cache_duration', 60);
+
+    EmailValidation::markAsBlocked('complainer@example.org', 'Spam complaint', 400);
+    EmailValidation::where('email', 'complainer@example.org')
+        ->update(['last_checked_at' => now()->subYear()]);
+
+    expect(EmailValidation::validateEmail('complainer@example.org'))->toBe('Spam complaint')
+        ->and(EmailValidation::isBlocked('complainer@example.org'))->toBeTrue();
+});
+
+it('re-checks a block recorded by an earlier Dutch-language version', function (): void {
+    config()->set('manta_mailtrap.validation.cache_duration', 60);
+
+    EmailValidation::saveValidation('not valid@example.org', 'blocked', 'MX records niet gevonden', 400);
+    EmailValidation::where('email', 'not valid@example.org')
+        ->update(['last_checked_at' => now()->subYear()]);
+
+    expect(EmailValidation::validateEmail('not valid@example.org'))->toBe('Invalid email format');
 });

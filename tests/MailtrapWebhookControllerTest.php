@@ -151,3 +151,24 @@ it('only updates the recipient the event is about when a message had several rec
     expect(MailLog::where('recipient', 'bounced@example.org')->value('status_code'))->toBe('550')
         ->and(MailLog::where('recipient', 'delivered@example.org')->value('status_code'))->toBe('200');
 });
+
+it('finds the mail log through the custom variable when Mailtrap uses its own message id', function (): void {
+    MailLog::create([
+        'message_id' => 'local-uuid',
+        'sender' => 'sender@example.org',
+        'recipient' => 'linked@example.org',
+        'subject' => 'Subject',
+        'status_code' => '200',
+    ]);
+
+    $this->postSignedWebhook(['events' => [[
+        'email' => 'linked@example.org',
+        'event' => 'bounce',
+        'message_id' => 'mailtrap-own-id',
+        'response_code' => 550,
+        'custom_variables' => ['x_message_id' => 'local-uuid'],
+    ]]])->assertOk();
+
+    expect(MailLog::count())->toBe(1)
+        ->and(MailLog::where('message_id', 'local-uuid')->value('status_code'))->toBe('550');
+});

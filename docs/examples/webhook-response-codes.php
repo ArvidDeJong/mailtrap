@@ -5,8 +5,6 @@
  *
  * This file shows what MailtrapWebhookController does with the response_code
  * information in Mailtrap webhook events.
- *
- * @package Darvis\Mailtrap
  */
 
 // This is an example file - do not run it in production
@@ -14,60 +12,60 @@
 
 // Sample data as Mailtrap sends it
 $webhookData = [
-    "events" => [
+    'events' => [
         [
-            "event" => "bounce",
-            "response" => "[CS01] Message rejected due to local policy",
-            "response_code" => 555,
-            "bounce_category" => "spam",
-            "category" => "Password reset",
-            "custom_variables" => [
-                "variable_a" => "value",
-                "variable_b" => "value2"
+            'event' => 'bounce',
+            'response' => '[CS01] Message rejected due to local policy',
+            'response_code' => 555,
+            'bounce_category' => 'spam',
+            'category' => 'Password reset',
+            'custom_variables' => [
+                'variable_a' => 'value',
+                'variable_b' => 'value2',
             ],
-            "message_id" => "1df37d17-0286-4d8b-8edf-bc4ec5be86e6",
-            "email" => "receiver@example.com",
-            "event_id" => "bede7236-2284-43d6-a953-1fdcafd0fdbc",
-            "timestamp" => 1733497282,
-            "sending_domain_name" => "examplesender.com",
-            "sending_stream" => "transactional"
+            'message_id' => '1df37d17-0286-4d8b-8edf-bc4ec5be86e6',
+            'email' => 'receiver@example.com',
+            'event_id' => 'bede7236-2284-43d6-a953-1fdcafd0fdbc',
+            'timestamp' => 1733497282,
+            'sending_domain_name' => 'examplesender.com',
+            'sending_stream' => 'transactional',
         ],
         [
-            "event" => "bounce",
-            "response" => "5.5.1 User Unknown",
-            "response_code" => 550,
-            "bounce_category" => "badrecipient",
-            "category" => "Email confirmation",
-            "custom_variables" => [
-                "foo" => "bar",
-                "baz" => 123
+            'event' => 'bounce',
+            'response' => '5.5.1 User Unknown',
+            'response_code' => 550,
+            'bounce_category' => 'badrecipient',
+            'category' => 'Email confirmation',
+            'custom_variables' => [
+                'foo' => 'bar',
+                'baz' => 123,
             ],
-            "message_id" => "ca7974af-7212-42aa-99fb-cc4742d0658b",
-            "email" => "another@example.com",
-            "event_id" => "657b8544-6a95-4c47-997f-6e47922a5052",
-            "timestamp" => 1733497341,
-            "sending_domain_name" => "examplesender.com",
-            "sending_stream" => "transactional"
+            'message_id' => 'ca7974af-7212-42aa-99fb-cc4742d0658b',
+            'email' => 'another@example.com',
+            'event_id' => '657b8544-6a95-4c47-997f-6e47922a5052',
+            'timestamp' => 1733497341,
+            'sending_domain_name' => 'examplesender.com',
+            'sending_stream' => 'transactional',
         ],
         [
-            "event" => "delivery",
-            "category" => "Welcome email",
-            "message_id" => "test-delivery-123",
-            "email" => "success@example.com",
-            "event_id" => "delivery-test-456",
-            "timestamp" => 1733497400,
-            "sending_domain_name" => "examplesender.com",
-            "sending_stream" => "transactional"
+            'event' => 'delivery',
+            'category' => 'Welcome email',
+            'message_id' => 'test-delivery-123',
+            'email' => 'success@example.com',
+            'event_id' => 'delivery-test-456',
+            'timestamp' => 1733497400,
+            'sending_domain_name' => 'examplesender.com',
+            'sending_stream' => 'transactional',
             // Delivery events carry no response_code
-        ]
-    ]
+        ],
+    ],
 ];
 
 echo "Mailtrap webhook response code handling\n";
 echo "=======================================\n\n";
 
 echo "Sample data:\n";
-echo json_encode($webhookData, JSON_PRETTY_PRINT) . "\n\n";
+echo json_encode($webhookData, JSON_PRETTY_PRINT)."\n\n";
 
 echo "Expected results:\n";
 echo "- receiver@example.com: status_code = 555, reason = '[CS01] Message rejected due to local policy'\n";

@@ -2,6 +2,7 @@
 
 namespace Darvis\Mailtrap\Http\Controllers;
 
+use Darvis\Mailtrap\Events\MailtrapEventReceived;
 use Darvis\Mailtrap\Models\EmailValidation;
 use Darvis\Mailtrap\Models\MailLog;
 use Darvis\Mailtrap\Support\PackageLog;
@@ -85,25 +86,32 @@ class MailtrapWebhookController extends Controller
             ], fn (mixed $value): bool => $value !== null);
 
             [$status, $defaultStatusCode] = self::EVENTS[$event['event']] ?? [null, null];
+            $mailLog = null;
 
             if ($status === null) {
                 PackageLog::info('Mailtrap event needs no action', $context);
                 $stats['skipped']++;
+            } else {
+                try {
+                    $mailLog = $this->apply($event, $status, $defaultStatusCode);
+                } catch (\Throwable $e) {
+                    PackageLog::error('Failed to process Mailtrap event', $context + ['error' => $e->getMessage()]);
+                    $stats['skipped']++;
 
-                continue;
+                    continue;
+                }
+
+                PackageLog::info("Email marked as {$status} by Mailtrap webhook", $context);
+                $stats[$status === EmailValidation::VALID ? 'valid_emails' : 'invalid_emails']++;
             }
 
+            // A failing listener in the host application must not cost the rest
+            // of the batch, nor make Mailtrap retry events that were processed.
             try {
-                $this->apply($event, $status, $defaultStatusCode);
+                MailtrapEventReceived::dispatch($event['event'], $event['email'], $event, $mailLog);
             } catch (\Throwable $e) {
-                PackageLog::error('Failed to process Mailtrap event', $context + ['error' => $e->getMessage()]);
-                $stats['skipped']++;
-
-                continue;
+                PackageLog::error('A MailtrapEventReceived listener failed', $context + ['error' => $e->getMessage()]);
             }
-
-            PackageLog::info("Email marked as {$status} by Mailtrap webhook", $context);
-            $stats[$status === EmailValidation::VALID ? 'valid_emails' : 'invalid_emails']++;
         }
 
         return response()->json([
@@ -121,8 +129,9 @@ class MailtrapWebhookController extends Controller
      * Record the event on the address and on the mail log.
      *
      * @param  array<string, mixed>  $event
+     * @return MailLog|null The updated or created log, or null when the event has no message id.
      */
-    private function apply(array $event, string $status, int $defaultStatusCode): void
+    private function apply(array $event, string $status, int $defaultStatusCode): ?MailLog
     {
         $email = $event['email'];
         $statusCode = (string) ($event['response_code'] ?? $defaultStatusCode);
@@ -136,27 +145,32 @@ class MailtrapWebhookController extends Controller
             EmailValidation::markAsInvalid($email, $reason, $statusCode);
         }
 
-        $messageId = $event['message_id'] ?? null;
+        // Prefer the id the MessageSending listener passed along as a custom
+        // variable: Mailtrap may report its own message id instead.
+        $customId = $event['custom_variables'][MailLog::CUSTOM_VARIABLE] ?? null;
+        $messageId = is_string($customId) && $customId !== '' ? $customId : ($event['message_id'] ?? null);
 
-        if (! $messageId) {
-            return;
+        if (! is_string($messageId) || $messageId === '') {
+            return null;
         }
 
         // Recipients of one message share its id, so match the recipient as well.
-        $updated = MailLog::where('message_id', $messageId)
+        $mailLog = MailLog::where('message_id', $messageId)
             ->whereRaw('lower(recipient) = ?', [strtolower($email)])
-            ->update(array_filter(
+            ->first();
+
+        if ($mailLog !== null) {
+            $mailLog->update(array_filter(
                 ['status_code' => $statusCode, 'error_message' => $reason],
                 fn (?string $value): bool => $value !== null,
             ));
 
-        if ($updated > 0) {
-            return;
+            return $mailLog;
         }
 
         // The local MessageSending listener may not have run, e.g. for mail sent
         // through the Mailtrap API directly.
-        MailLog::create([
+        return MailLog::create([
             'message_id' => $messageId,
             'sender' => $event['sending_domain_name'] ?? null,
             'recipient' => $email,

@@ -26,6 +26,8 @@ $log->related; // the Invoice
 </code-snippet>
 @endverbatim
 
-- Setup and checks: `php artisan mailtrap:install` (migrations, token, webhook), `php artisan mailtrap:webhook` (creates the webhook and writes `MAILTRAP_WEBHOOK_SECRET`), `php artisan mailtrap:test you@example.com` (exit code 0 when the mail went out).
+- Setup and checks: `php artisan mailtrap:install` (interactive setup wizard: migrations, API token, Mailtrap SMTP, webhook, validation, inbox, test mail; flag-driven with `--no-interaction`), `php artisan mailtrap:webhook` (creates the webhook and writes `MAILTRAP_WEBHOOK_SECRET`), `php artisan mailtrap:test you@example.com` (exit code 0 when the mail went out).
 - The webhook `POST /api/webhooks/mailtrap` rejects unsigned calls with 403, and it also does that while no secret is set. After changing `.env`, run `php artisan config:cache` again on servers with a cached config.
+- To react to mail events, listen for `Darvis\Mailtrap\Events\MailBlocked` (before a blocked send is aborted) or `Darvis\Mailtrap\Events\MailtrapEventReceived` (every webhook event, including `unsubscribe`, which the package itself ignores). Don't add a second webhook route for this.
+- Outgoing mail gets an `X-MT-Custom-Variables` header containing `x_message_id`. When you set your own custom variables, add them to that JSON; don't replace the header.
 - `Darvis\Mailtrap\Services\MailtrapService` and `app('mailtrap')` are deprecated; use `EmailValidation::validateEmail()` instead.

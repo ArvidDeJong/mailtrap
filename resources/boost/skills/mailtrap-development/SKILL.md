@@ -14,7 +14,7 @@ Use this skill when code sends mail in an application that has `darvis/mailtrap`
 1. On `MessageSending`, every To, Cc and Bcc address runs through `EmailValidation::validateEmail()`: a format check, then the MX record and whether it resolves to an IP. The DNS lookups are skipped when another address on the domain is already valid. Set `validation.enabled` to false to skip validation altogether.
 2. A `blocked` address aborts the send: a `MailLog` row with status `550` is written and a `TransportException` is thrown.
 3. Otherwise one `MailLog` row per recipient is created with `status_code = null`. Every row of the mail shares the `X-Message-ID` header.
-4. On `MessageSent` those rows become `200`. Mailtrap webhook events later update the row for that message id and recipient.
+4. On `MessageSent` those rows become `200`. Mailtrap webhook events later update the row for that recipient. The row is found through the `x_message_id` custom variable (the `X-MT-Custom-Variables` header), otherwise through Mailtrap's `message_id`.
 
 ## Tagging mail with a model
 
@@ -45,8 +45,28 @@ Logs older than `logging.cleanup_after_days` are pruned by `php artisan model:pr
 | `EmailValidation::BLOCKED` | failed format or MX check, `markAsBlocked()` | yes |
 
 - Use `markAsBlocked($email, $reason)` only to halt mail to that one address, for example after a complaint. It never affects other addresses on the domain.
-- Blocked records that come from a local check expire after `validation.cache_duration` seconds and are then checked again.
+- Blocks from a local check (reasons in `EmailValidation::LOCAL_CHECK_REASONS`) expire after `validation.cache_duration` seconds and are then checked again. Manual blocks never expire.
 - To check many addresses without DNS lookups, use `EmailValidation::bulkValidationStatus($emails)`. To validate the addresses that have no verdict yet, use `bulkValidationWithCheck($emails, true)`.
+
+## Reacting to events
+
+```php
+use Darvis\Mailtrap\Events\MailBlocked;
+use Darvis\Mailtrap\Events\MailtrapEventReceived;
+
+Event::listen(function (MailtrapEventReceived $event): void {
+    // $event->type, $event->email, $event->payload (raw Mailtrap event), $event->mailLog (null for ignored types)
+    if ($event->type === 'unsubscribe') {
+        // ...
+    }
+});
+
+Event::listen(function (MailBlocked $event): void {
+    // $event->email, $event->reason, $event->message (Symfony Email), $event->mailLog
+});
+```
+
+`MailtrapEventReceived` also fires for `unsubscribe`, `soft bounce` and `suspension`, which the package does not act on. A listener that throws does not break the webhook batch.
 
 ## Testing
 

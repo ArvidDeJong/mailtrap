@@ -76,12 +76,12 @@ class MailtrapService
         }
     }
 
-    protected function handleInvalid(string $email, string $reason, ?string $statusCode = null): void
+    protected function handleInvalid(string $email, string $reason, int|string|null $statusCode = null): void
     {
         EmailValidation::markAsInvalid($email, $reason, $statusCode);
     }
 
-    protected function handleFailure(string $email, string $reason, ?string $statusCode = null): void
+    protected function handleFailure(string $email, string $reason, int|string|null $statusCode = null): void
     {
         EmailValidation::markAsBlocked($email, $reason, $statusCode);
     }

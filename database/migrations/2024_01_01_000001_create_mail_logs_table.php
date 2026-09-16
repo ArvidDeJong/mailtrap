@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         // Skip when the table already exists
-        if (!Schema::hasTable('mail_logs')) {
+        if (! Schema::hasTable('mail_logs')) {
             Schema::create('mail_logs', function (Blueprint $table) {
                 $table->id();
                 $table->string('message_id')->nullable(); // Nullable for blocked emails without message_id
@@ -24,7 +24,7 @@ return new class extends Migration
                 $table->string('type')->nullable();
                 $table->string('model')->nullable();
                 $table->unsignedBigInteger('model_id')->nullable();
-                
+
                 // Index on message_id for lookups (not unique since can be null)
                 $table->index('message_id', 'mail_logs_message_id_index');
             });

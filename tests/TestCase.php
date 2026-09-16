@@ -3,14 +3,19 @@
 namespace Darvis\Mailtrap\Tests;
 
 use Darvis\Mailtrap\MailtrapServiceProvider;
+use Flux\FluxServiceProvider;
 use Illuminate\Testing\TestResponse;
+use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
     protected function getPackageProviders($app)
     {
+        // Load Livewire and Flux like a host app with the inbox UI would.
         return [
+            LivewireServiceProvider::class,
+            FluxServiceProvider::class,
             MailtrapServiceProvider::class,
         ];
     }
@@ -30,6 +35,9 @@ abstract class TestCase extends BaseTestCase
         ]);
 
         $app['config']->set('manta_mailtrap.webhook.secret', self::WEBHOOK_SECRET);
+
+        // Livewire encrypts component snapshots.
+        $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
     }
 
     /**

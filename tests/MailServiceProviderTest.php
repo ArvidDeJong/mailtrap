@@ -90,3 +90,20 @@ it('logs a message that has a Sender header but no From', function (): void {
 
     expect(MailLog::where('recipient', 'solo@example.org')->value('sender'))->toBe('robot@example.org');
 });
+
+it('passes the log message id to Mailtrap as a custom variable, keeping existing variables', function (): void {
+    EmailValidation::saveValidation('solo@example.org', 'valid', 'ok', 200);
+
+    Mail::raw('Body', function ($message): void {
+        $message->to('solo@example.org')->subject('Custom variables');
+        $message->getHeaders()->addTextHeader('X-MT-Custom-Variables', '{"user_id":"42"}');
+    });
+
+    $sent = app('mailer')->getSymfonyTransport()->messages()->sole()->getOriginalMessage();
+    $variables = json_decode($sent->getHeaders()->get('X-MT-Custom-Variables')->getBodyAsString(), true);
+
+    expect($variables)->toBe([
+        'user_id' => '42',
+        'x_message_id' => MailLog::where('recipient', 'solo@example.org')->value('message_id'),
+    ]);
+});

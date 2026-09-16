@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`mailtrap:install` is now a step-by-step setup wizard** for people installing the
+  package for the first time. It explains each step, then checks `.env`, `APP_URL` and
+  the database connection. It runs the migrations, verifies the API token with Mailtrap
+  before saving it, and can fill in the Mailtrap SMTP settings (`live.smtp.mailtrap.io`,
+  user `api`, token as password) and the sender address. It creates the webhook, or
+  explains that a local site needs the wizard on the live server. It also covers address
+  validation, access to the inbox page (with a warning when there is no `login` route),
+  the inbox layout and the Tailwind `@source` line, and it sends a test mail. Answers go
+  to `.env` right away, and a summary lists the open items.
+- Without a terminal (`--no-interaction`), `mailtrap:install` asks nothing and follows
+  only its flags. It no longer offers to publish the config file: pass `--config` for that.
+  `--token` is still written to `.env` when it differs from the stored token.
+- **Requires PHP 8.2.** The package claimed `^8.1`, but Laravel 11 already needs 8.2, so
+  8.1 could never install it.
+- **Manual blocks no longer expire.** `validation.cache_duration` applied to every
+  `blocked` address, so a block set with `markAsBlocked()` lifted itself after an hour.
+  Now only blocks from the local format and DNS checks expire.
+
+### Added
+
+- **Events for the host application.** `Darvis\Mailtrap\Events\MailBlocked` is
+  dispatched just before a send to a blocked address is aborted.
+  `Darvis\Mailtrap\Events\MailtrapEventReceived` is dispatched for every signed webhook
+  event, including `unsubscribe`, `soft bounce` and `suspension`, which the package does
+  not act on itself. A listener that throws is logged and does not affect the rest of the
+  batch.
+- **Webhook events find their log through a Mailtrap custom variable.** Every outgoing
+  mail gets `x_message_id` in the `X-MT-Custom-Variables` header, and the webhook uses it
+  before Mailtrap's own `message_id`. Custom variables the application already set are
+  kept. Previously a webhook could create a second log row when Mailtrap reported its
+  own id.
+- GitHub Actions: tests on PHP 8.2–8.4 against Laravel 11, 12 and 13 with lowest and
+  stable dependencies, plus Pint and Larastan.
+- `composer lint`, `composer format` and `composer analyse`, and a `LICENSE` file.
+- `.gitattributes` keeps `tests/`, `docs/` and other development files out of the
+  installed package.
+
+### Fixed
+
+- **The inbox page crashed on Livewire 4** with a Blade syntax error: `wire:key` with an
+  interpolated value on a Flux component inside a loop compiles to invalid PHP there.
+- **An app with Livewire installed but its provider excluded from discovery crashed on
+  boot.** The inbox is now only registered when Livewire is actually loaded.
+- The `suggest` for Flux now names the minimum version: the free `card` and `table`
+  components the inbox uses arrived in Flux 2.11.
+
 ## [1.2.0] - 2026-09-16
 
 ### Added

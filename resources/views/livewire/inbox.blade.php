@@ -74,7 +74,7 @@
         <flux:table.rows>
             @forelse ($this->logs as $log)
                 @php($meta = $this->statusMeta($log->status_code))
-                <flux:table.row wire:key="log-{{ $log->id }}" wire:click="select({{ $log->id }})" class="cursor-pointer">
+                <flux:table.row :wire:key="'log-'.$log->id" wire:click="select({{ $log->id }})" class="cursor-pointer">
                     <flux:table.cell class="py-2">
                         <flux:badge :color="$meta['color']" size="sm">{{ $meta['label'] }}</flux:badge>
                     </flux:table.cell>

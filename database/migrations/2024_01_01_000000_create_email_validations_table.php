@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         // Skip when the table already exists
-        if (!Schema::hasTable('email_validations')) {
+        if (! Schema::hasTable('email_validations')) {
             Schema::create('email_validations', function (Blueprint $table) {
                 $table->id();
                 $table->string('email')->nullable();
@@ -22,10 +22,10 @@ return new class extends Migration
                 $table->string('status_code')->nullable();
                 $table->timestamp('last_checked_at')->useCurrent()->useCurrentOnUpdate();
                 $table->timestamps();
-                
+
                 // Unique constraint on the email and domain combination
                 $table->unique(['email', 'domain'], 'email_blacklist_email_domain_unique');
-                
+
                 // Indexes for lookups
                 $table->index('email');
                 $table->index('domain');

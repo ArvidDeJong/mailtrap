@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('mail_logs', function (Blueprint $table) {
-            if (!Schema::hasColumn('mail_logs', 'error_message')) {
+            if (! Schema::hasColumn('mail_logs', 'error_message')) {
                 $table->text('error_message')->nullable()->after('status_code');
             }
-            if (!Schema::hasColumn('mail_logs', 'source_file')) {
+            if (! Schema::hasColumn('mail_logs', 'source_file')) {
                 $table->string('source_file')->nullable()->after('error_message');
             }
-            if (!Schema::hasColumn('mail_logs', 'source_line')) {
+            if (! Schema::hasColumn('mail_logs', 'source_line')) {
                 $table->unsignedInteger('source_line')->nullable()->after('source_file');
             }
         });

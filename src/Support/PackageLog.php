@@ -14,7 +14,7 @@ class PackageLog
      */
     public static function info(string $message, array $context = []): void
     {
-        static::write('info', $message, $context);
+        self::write('info', $message, $context);
     }
 
     /**
@@ -22,7 +22,7 @@ class PackageLog
      */
     public static function warning(string $message, array $context = []): void
     {
-        static::write('warning', $message, $context);
+        self::write('warning', $message, $context);
     }
 
     /**
@@ -30,7 +30,7 @@ class PackageLog
      */
     public static function error(string $message, array $context = []): void
     {
-        static::write('error', $message, $context);
+        self::write('error', $message, $context);
     }
 
     /**

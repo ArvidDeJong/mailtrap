@@ -1,0 +1,15 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+    ignoreErrors:
+        # Larastan cannot resolve views registered under a package namespace.
+        -
+            identifier: argument.type
+            message: '#view-string\|null, string given#'
+            path: src/Livewire/MailtrapInbox.php
+    paths:
+        - src
+        - database
+        - routes
