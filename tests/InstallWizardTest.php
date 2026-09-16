@@ -69,6 +69,7 @@ it('walks a live site through mailer, webhook, validation and inbox', function (
         ->expectsOutputToContain('Step 1 of 8 · Check the basics')
         ->expectsQuestion('Paste your Mailtrap API token', 'good-token')
         ->expectsChoice('How does this site send mail?', 'mailtrap', MAILER_CHOICES)
+        ->expectsQuestion('Paste the SMTP password of your sending domain', 'domain-token')
         ->expectsQuestion('Sender address (the From of every mail)', 'noreply@example.com')
         ->expectsConfirmation('Set up the webhook?', 'yes')
         ->expectsQuestion('Public webhook URL', 'https://example.com/api/webhooks/mailtrap')
@@ -84,12 +85,31 @@ it('walks a live site through mailer, webhook, validation and inbox', function (
     expect(wizardEnv())
         ->toContain("APP_NAME=Test\nMAIL_MAILER=smtp\n")
         ->toContain('MAILTRAP_API_TOKEN=good-token')
-        ->toContain("MAIL_HOST=live.smtp.mailtrap.io\nMAIL_PORT=587\nMAIL_USERNAME=api\nMAIL_PASSWORD=good-token\nMAIL_FROM_ADDRESS=noreply@example.com")
+        ->toContain("MAIL_HOST=live.smtp.mailtrap.io\nMAIL_PORT=587\nMAIL_USERNAME=api\nMAIL_PASSWORD=domain-token\nMAIL_FROM_ADDRESS=noreply@example.com")
         ->toContain("MAILTRAP_WEBHOOK_ENABLED=true\nMAILTRAP_WEBHOOK_SECRET=".WIZARD_SECRET)
         ->toContain("MAILTRAP_UI_ENABLED=true\nMAILTRAP_UI_MIDDLEWARE=web,auth")
         ->not->toContain('MAILTRAP_VALIDATION_ENABLED');
 
-    expect(config('mail.mailers.smtp.host'))->toBe('live.smtp.mailtrap.io');
+    expect(config('mail.mailers.smtp.host'))->toBe('live.smtp.mailtrap.io')
+        ->and(config('mail.mailers.smtp.password'))->toBe('domain-token');
+});
+
+it('sets up sending through Mailtrap without an account API token', function (): void {
+    fakeWizardMailtrapApi();
+
+    $this->artisan('mailtrap:install', ['--skip-migrations' => true])
+        ->expectsQuestion('Paste your Mailtrap API token', '')
+        ->expectsChoice('How does this site send mail?', 'mailtrap', MAILER_CHOICES)
+        ->expectsQuestion('Paste the SMTP password of your sending domain', 'domain-token')
+        ->expectsQuestion('Sender address (the From of every mail)', 'noreply@example.com')
+        ->expectsChoice('How should recipients be checked?', 'block', VALIDATION_CHOICES)
+        ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
+        ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
+        ->assertSuccessful();
+
+    expect(wizardEnv())
+        ->toContain('MAIL_PASSWORD=domain-token')
+        ->not->toContain('MAILTRAP_API_TOKEN');
 });
 
 it('asks for another token when Mailtrap rejects one', function (): void {
@@ -124,6 +144,7 @@ it('keeps the current token and leaves the webhook for the live server on a loca
         ->expectsOutputToContain('APP_URL points at this computer')
         ->expectsConfirmation('Keep the current API token (…oken)?', 'yes')
         ->expectsChoice('How does this site send mail?', 'mailtrap', MAILER_CHOICES)
+        ->expectsQuestion('Paste the SMTP password of your sending domain', 'domain-token')
         ->expectsQuestion('Sender address (the From of every mail)', 'noreply@example.com')
         ->expectsConfirmation('Set up the webhook?', 'yes')
         ->expectsChoice('What do you want to do?', 'later', [

@@ -82,13 +82,32 @@ composer require darvis/mailtrap
 php artisan mailtrap:install
 ```
 
+### Mailtrap credentials: two tokens and a secret
+
+A site that sends through Mailtrap and receives its webhook needs **two different
+Mailtrap tokens**, plus the webhook secret. They are easy to mix up:
+
+| `.env` variable | What it is | Where to find it in Mailtrap | Used for |
+| --- | --- | --- | --- |
+| `MAIL_PASSWORD` | Token of your **sending domain** (with `MAIL_USERNAME=api`) | Sending Domains → your domain → Integration → SMTP → Password | Sending mail over SMTP |
+| `MAILTRAP_API_TOKEN` | **Account** API token with Admin access | Settings → API Tokens → Add Token | Creating the webhook (`mailtrap:install`, `mailtrap:webhook`) |
+| `MAILTRAP_WEBHOOK_SECRET` | Signing secret of the webhook, not a token | Written by `mailtrap:webhook`, or shown once in the webhook's detail panel | Verifying incoming webhook calls |
+
+- The account token cannot replace the domain token: Mailtrap only accepts a token with
+  admin access to the sending domain as SMTP password.
+- `MAILTRAP_API_TOKEN` is only needed while creating the webhook. At runtime the webhook
+  needs just `MAILTRAP_WEBHOOK_SECRET`.
+- Not sending through Mailtrap? Then you need none of the three.
+
+### Setup wizard
+
 `mailtrap:install` is a setup wizard. It walks you through eight steps and explains each
 one before it asks anything:
 
 1. **Check the basics**: `.env`, `APP_URL`, the database connection and the current mailer
 2. **Database tables**: runs the migrations
-3. **Mailtrap API token**: explains where to create one and verifies it with Mailtrap
-4. **Sending mail**: fills in the Mailtrap SMTP settings and the sender address, or keeps your own mailer
+3. **Mailtrap API token**: the account token for the webhook; explains where to create one and verifies it with Mailtrap
+4. **Sending mail**: asks for the sending domain token and fills in the Mailtrap SMTP settings and the sender address, or keeps your own mailer
 5. **Webhook**: creates the webhook and stores its signing secret. On a local site it tells you to run the wizard on the live server instead.
 6. **Address validation**: check and block, check and only log, or off
 7. **Inbox page**: who may open it, which layout it uses and the Tailwind `@source` line
@@ -137,7 +156,7 @@ php artisan vendor:publish --tag=mailtrap-config
 
 This creates a `config/manta_mailtrap.php` file with configuration for:
 
-- **API Settings** - Mailtrap API token and base URL
+- **API Settings** - Account API token (for creating the webhook) and API URLs
 - **Email Validation** - Validation settings and caching
 - **Mail Logging** - Log settings for outgoing emails (incl. `cleanup_after_days` retention)
 - **Webhook** - Webhook configuration and signature verification
@@ -146,7 +165,7 @@ This creates a `config/manta_mailtrap.php` file with configuration for:
 
 **Environment Variables:**
 ```env
-MAILTRAP_API_TOKEN=your_api_token_here
+MAILTRAP_API_TOKEN=your_account_api_token   # account token, only for creating the webhook
 MAILTRAP_VALIDATION_ENABLED=true
 MAILTRAP_BLOCK_INVALID_EMAILS=true
 MAILTRAP_VALIDATION_CACHE_DURATION=3600
@@ -155,7 +174,7 @@ MAILTRAP_LOG_SUCCESSFUL=true
 MAILTRAP_LOG_FAILED=true
 MAILTRAP_CLEANUP_AFTER_DAYS=30
 MAILTRAP_WEBHOOK_ENABLED=true
-MAILTRAP_WEBHOOK_SECRET=your_webhook_secret
+MAILTRAP_WEBHOOK_SECRET=your_webhook_secret # not a token: the webhook's signing secret
 MAILTRAP_WEBHOOK_VERIFY_SIGNATURE=true
 
 # Inbox UI

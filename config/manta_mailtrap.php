@@ -7,8 +7,12 @@ return [
     | Mailtrap API Configuration
     |--------------------------------------------------------------------------
     |
-    | Credentials and endpoints for the Mailtrap API. The token needs admin
-    | access to the account for mailtrap:install and mailtrap:webhook.
+    | Credentials and endpoints for the Mailtrap account API. The token needs
+    | admin access to the account and is only used by mailtrap:install and
+    | mailtrap:webhook to create the webhook.
+    |
+    | This is not the SMTP password. Sending through Mailtrap uses the token of
+    | the sending domain as MAIL_PASSWORD (Sending Domains → Integration).
     |
     */
 

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`mailtrap:install` wrote the account API token as SMTP password.** Mailtrap only
+  accepts the token of the sending domain there, so mail failed to authenticate. The
+  wizard now asks for the sending domain token separately in the "Sending mail" step
+  (Sending Domains → your domain → Integration → SMTP), and sending can be set up
+  without an account token.
+
+### Changed
+
+- The README, config file and Boost guideline explain the two Mailtrap tokens and the
+  webhook secret: which `.env` variable each goes in, where to find it and what it is for.
+
 ## [1.3.0] - 2026-09-16
 
 ### Changed

@@ -220,11 +220,15 @@ class MailtrapInstallCommand extends Command
     private function stepApiToken(): bool
     {
         note(implode("\n", [
-            'The package talks to Mailtrap with an API token. To create one:',
-            '  1. Log in at https://mailtrap.io',
-            '  2. Go to Settings → API Tokens → Add Token',
-            '  3. Give the token Admin access to your account',
-            'Admin access is needed to create the webhook in step 5.',
+            'Mailtrap uses two different tokens. This step asks for the first one.',
+            '',
+            '  Account API token (this step): lets the package create the webhook.',
+            '    1. Log in at https://mailtrap.io',
+            '    2. Go to Settings → API Tokens → Add Token',
+            '    3. Give the token Admin access to your account',
+            '',
+            '  Sending domain token (the next step): the SMTP password for sending mail.',
+            'You only need this first token when this site receives the webhook.',
         ]));
 
         $current = $this->currentApiToken();
@@ -300,9 +304,21 @@ class MailtrapInstallCommand extends Command
             return true;
         }
 
-        if ($this->apiToken === null) {
-            $this->components->warn('Sending through Mailtrap uses the API token as SMTP password, and step 3 has none. Mail settings left unchanged.');
-            $this->result('Sending mail', 'todo', 'needs an API token first');
+        note(implode("\n", [
+            'Sending needs the token of your sending domain, not the account API token from the previous step.',
+            'Mailtrap only accepts a token with admin access to the domain as SMTP password.',
+            '  1. In Mailtrap, go to Sending Domains and open your domain',
+            '  2. Open the Integration tab and choose SMTP',
+            '  3. Copy the Password shown there (it is the domain\'s API token)',
+        ]));
+
+        $smtpPassword = trim(password(
+            'Paste the SMTP password of your sending domain',
+            hint: 'Leave empty to keep your current mail settings for now.',
+        ));
+
+        if ($smtpPassword === '') {
+            $this->result('Sending mail', 'todo', 'no sending domain token; mail settings left unchanged');
 
             return true;
         }
@@ -323,7 +339,7 @@ class MailtrapInstallCommand extends Command
             'MAIL_HOST' => self::MAILTRAP_SMTP_HOST,
             'MAIL_PORT' => '587',
             'MAIL_USERNAME' => 'api',
-            'MAIL_PASSWORD' => $this->apiToken,
+            'MAIL_PASSWORD' => $smtpPassword,
             'MAIL_FROM_ADDRESS' => $from,
         ];
 
@@ -342,7 +358,7 @@ class MailtrapInstallCommand extends Command
             'mail.mailers.smtp.host' => self::MAILTRAP_SMTP_HOST,
             'mail.mailers.smtp.port' => 587,
             'mail.mailers.smtp.username' => 'api',
-            'mail.mailers.smtp.password' => $this->apiToken,
+            'mail.mailers.smtp.password' => $smtpPassword,
             'mail.mailers.smtp.scheme' => isset($variables['MAIL_SCHEME']) ? 'smtp' : config('mail.mailers.smtp.scheme'),
             'mail.mailers.smtp.encryption' => isset($variables['MAIL_ENCRYPTION']) ? 'tls' : config('mail.mailers.smtp.encryption'),
             'mail.from.address' => $from,
