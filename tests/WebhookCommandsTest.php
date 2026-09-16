@@ -122,17 +122,13 @@ it('installs with a webhook in one non-interactive run', function (): void {
     expect(envContents())->toContain("MAILTRAP_WEBHOOK_ENABLED=true\nMAILTRAP_WEBHOOK_SECRET=".NEW_SECRET);
 });
 
-it('reconfigures an existing site with a new token and a replaced webhook', function (): void {
+it('writes a new token passed to a non-interactive install', function (): void {
     fakeMailtrapApi([['id' => 7, 'url' => 'https://example.com/api/webhooks/mailtrap']]);
     config()->set('manta_mailtrap.api.token', null);
     file_put_contents($this->envDirectory.'/.env', "MAILTRAP_API_TOKEN=old-token\nMAILTRAP_WEBHOOK_ENABLED=true\nMAILTRAP_WEBHOOK_SECRET=stale\n");
 
-    $this->artisan('mailtrap:install', ['--webhook' => true, '--skip-migrations' => true])
+    $this->artisan('mailtrap:install', ['--webhook' => true, '--replace' => true, '--token' => 'new-token', '--skip-migrations' => true, '--no-interaction' => true])
         ->expectsOutputToContain('Reconfiguring darvis/mailtrap')
-        ->expectsConfirmation('Publish config/manta_mailtrap.php?', 'no')
-        ->expectsConfirmation('Keep the current API token (…oken)?', 'no')
-        ->expectsQuestion('Mailtrap API token (Settings → API Tokens, needs admin access)', 'new-token')
-        ->expectsConfirmation('Webhook #7 already exists for this URL. Mailtrap cannot show its secret again. Replace it with a new one?', 'yes')
         ->assertSuccessful();
 
     Http::assertSent(fn (Request $request): bool => $request->method() === 'DELETE' && $request->hasHeader('Api-Token', 'new-token'));
