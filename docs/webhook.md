@@ -1,3 +1,9 @@
+---
+title: "Webhook"
+description: "Process Mailtrap delivery, bounce, spam and reject events in Laravel, with signature verification and the mailtrap:webhook command."
+nav_order: 4
+---
+
 # Webhook
 
 Mailtrap reports delivery events to the package, which updates the mail logs and the
@@ -28,7 +34,7 @@ Each outgoing mail carries its log id to Mailtrap as the custom variable `x_mess
 returns it in every webhook event, so the event updates the right log row.
 
 Once the payload is readable, the endpoint answers `200`, so one failing event does not
-make Mailtrap retry the whole batch. Failed events are counted as skipped. See [webhook-response-codes.php](./examples/webhook-response-codes.php)
+make Mailtrap retry the whole batch. Failed events are counted as skipped. See [webhook-response-codes.php](https://github.com/ArvidDeJong/mailtrap/blob/main/docs/examples/webhook-response-codes.php)
 for how response codes in the payload are handled.
 
 ## Signature verification

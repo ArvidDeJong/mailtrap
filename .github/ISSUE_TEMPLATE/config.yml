@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/ArvidDeJong/mailtrap/security/advisories/new
+    about: Report a vulnerability privately.
+  - name: Documentation
+    url: https://arviddejong.github.io/mailtrap/
+    about: Installation, tokens, webhook, inbox and email validation.
+  - name: Problem with Mailtrap itself
+    url: https://help.mailtrap.io/
+    about: This is an independent package; account and delivery issues belong with Mailtrap.

@@ -4,10 +4,14 @@
 [![Tests](https://github.com/ArvidDeJong/mailtrap/actions/workflows/tests.yml/badge.svg)](https://github.com/ArvidDeJong/mailtrap/actions/workflows/tests.yml)
 [![Laravel](https://img.shields.io/badge/Laravel-11%20%7C%2012%20%7C%2013-red.svg)](https://laravel.com)
 [![PHP](https://img.shields.io/badge/PHP-8.2+-blue.svg)](https://php.net)
+[![Total downloads](https://img.shields.io/packagist/dt/darvis/mailtrap.svg)](https://packagist.org/packages/darvis/mailtrap)
+[![License](https://img.shields.io/packagist/l/darvis/mailtrap.svg)](LICENSE)
 
 Mailtrap integration for Laravel: address validation before sending, logging of every
 outgoing mail, delivery feedback through the Mailtrap webhook, and an inbox to inspect it
 all.
+
+An independent open-source package, not an official Mailtrap product.
 
 ## Features
 
@@ -65,6 +69,8 @@ php artisan mailtrap:test you@example.com
 
 ## Documentation
 
+Full documentation: **https://arviddejong.github.io/mailtrap/**
+
 | Topic | |
 | --- | --- |
 | [Installation & Configuration](docs/installation.md) | Tokens, setup wizard, config file, environment variables |
@@ -73,7 +79,7 @@ php artisan mailtrap:test you@example.com
 | [Inbox UI & Health Check](docs/inbox.md) | Inbox setup, Tailwind, `mailtrap:test` |
 | [Email Validation](docs/email-validation.md) | Single and bulk validation, collections, API reference, examples |
 
-Or start at the [documentation index](docs/README.md).
+Or start at the [documentation index](docs/README.md), or read the [FAQ](https://arviddejong.github.io/mailtrap/faq.html).
 
 ## Laravel Boost
 
@@ -92,6 +98,10 @@ composer analyse   # Larastan
 GitHub Actions runs the tests on PHP 8.2–8.4 against Laravel 11, 12 and 13, with both the
 lowest and the latest allowed dependencies. See the [changelog](CHANGELOG.md) for release
 notes.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Found a security problem? Please report it privately, see [SECURITY.md](SECURITY.md).
 
 ## Author
 

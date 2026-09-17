@@ -1,3 +1,9 @@
+---
+title: "Sending, blocking & mail logs"
+description: "What happens when a Laravel app sends mail with darvis/mailtrap: validation states, blocking per address, linking logs to models, pruning, events and other mailers."
+nav_order: 3
+---
+
 # Sending, Blocking & Mail Logs
 
 The package listens to Laravel's `MessageSending` and `MessageSent` events. Every

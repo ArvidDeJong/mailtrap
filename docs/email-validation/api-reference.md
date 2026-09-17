@@ -1,3 +1,10 @@
+---
+title: "API reference"
+description: "All EmailValidation methods of darvis/mailtrap, with parameters and return values."
+nav_order: 4
+parent: "Email validation"
+---
+
 # API Reference
 
 Complete reference for all EmailValidation model methods.

@@ -1,3 +1,10 @@
+---
+title: "Bulk validation"
+description: "Validate many email addresses at once with bulkValidationStatus and bulkValidationWithCheck."
+nav_order: 2
+parent: "Email validation"
+---
+
 # Bulk Validation
 
 For efficiently checking multiple email addresses at once.

@@ -1,3 +1,9 @@
+---
+title: "Installation & configuration"
+description: "Install darvis/mailtrap: requirements, the two Mailtrap tokens and the webhook secret, the setup wizard, the config file and environment variables."
+nav_order: 2
+---
+
 # Installation & Configuration
 
 ## Requirements

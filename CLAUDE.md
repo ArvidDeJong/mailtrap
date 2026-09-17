@@ -85,6 +85,7 @@ Captures `debug_backtrace` to record `source_file` and `source_line` of the call
 
 ## Conventions specific to this package
 
+- `docs/` is also the GitHub Pages site (Jekyll, Just the Docs, `docs/_config.yml`); `docs/README.md` is only for browsing on GitHub and is excluded from the site. Every page needs `title`, `description` and `nav_order` front matter; pages under `docs/email-validation/` also need `parent: "Email validation"`. Quote front matter values: an unquoted `: ` makes Jekyll silently drop the whole block. Don't write `{{ }}` or `{% %}` in code examples; Liquid is intended only in `faq.md`, `llms.txt` and `_includes/`. Package facts live in `docs/_config.yml` (`package`, `developer`) and FAQ answers in `docs/_data/faq.yml`; the pages, the structured data and `llms.txt` read from there. The footer credit is `ARVID.NL` only. The site says the package is not an official Mailtrap product; keep it that way and don't use Mailtrap's logo. `tests/DocsSiteTest.php` guards these rules.
 - `resources/boost/` holds the Laravel Boost guideline and the `mailtrap-development` skill that host apps receive. Update them when public behaviour, commands or config change.
 - Keep the public API compatible within 1.x. Don't add return types to existing public methods that host apps may override, and don't change `$casts` into `casts()`. Deprecate first and remove in 2.0.
 

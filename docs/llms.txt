@@ -1,0 +1,33 @@
+---
+layout: null
+permalink: /llms.txt
+sitemap: false
+---
+# {{ site.package.name }}
+
+> {{ site.description }}
+
+An independent open-source package, not an official Mailtrap product.
+
+- Install: `composer require {{ site.package.name }}` then `php artisan mailtrap:install`
+- Requires: {{ site.package.requires }}
+- License: MIT
+- Source: {{ site.package.repository }}
+- Packagist: {{ site.package.packagist }}
+
+## Documentation
+{% assign top = site.pages | where_exp: "p", "p.nav_order" | where_exp: "p", "p.parent == nil" | sort: "nav_order" %}
+{%- for p in top %}
+- [{{ p.title }}]({{ p.url | absolute_url }}): {{ p.description | default: site.description }}
+{%- if p.has_children %}
+{%- assign children = site.pages | where: "parent", p.title | sort: "nav_order" %}
+{%- for c in children %}
+  - [{{ c.title }}]({{ c.url | absolute_url }}): {{ c.description }}
+{%- endfor %}
+{%- endif %}
+{%- endfor %}
+
+## FAQ
+{% for item in site.data.faq %}
+- **{{ item.q }}** {{ item.a }}
+{%- endfor %}

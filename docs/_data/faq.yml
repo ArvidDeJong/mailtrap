@@ -1,0 +1,31 @@
+# Questions as people ask them to an assistant. Short, factual answers, checked against the docs.
+# Rendered on faq.md, in the FAQPage structured data and in llms.txt.
+- q: How do I log every outgoing email in Laravel?
+  a: Install `darvis/mailtrap`. Every mail the application sends is logged automatically in the `mail_logs` table, one row per recipient, and can be linked to a model with the `X-Mail-Model` and `X-Mail-Model-ID` headers.
+
+- q: Does darvis/mailtrap only work when I send through Mailtrap?
+  a: No. Address validation and mail logging work with any Laravel mailer, such as SES or Microsoft Graph. Delivery feedback through the webhook needs Mailtrap.
+
+- q: Which Mailtrap tokens does a Laravel app need?
+  a: "Two tokens and a secret: `MAIL_PASSWORD` is the sending domain token (with `MAIL_USERNAME=api`), `MAILTRAP_API_TOKEN` is an account token with Admin access that is only used to create the webhook, and `MAILTRAP_WEBHOOK_SECRET` is the webhook's signing secret."
+
+- q: How do I stop sending email to one address?
+  a: Call `EmailValidation::markAsBlocked($email, $reason)`. Mail to that address is aborted with a `TransportException`; other addresses on the same domain are not affected.
+
+- q: Does a bounce block future mail to that address?
+  a: No. Bounce, spam and reject events mark the address as invalid, which is recorded but does not stop sending. Only a blocked address stops a send.
+
+- q: How is the Mailtrap webhook secured?
+  a: The endpoint checks the HMAC-SHA256 signature of the raw request body against the `Mailtrap-Signature` header, and rejects unsigned calls with 403, also while no secret is configured.
+
+- q: Do I need Livewire to use darvis/mailtrap?
+  a: Only for the inbox UI, which needs Livewire ^3.7.4 or ^4.0 and Flux ^2.11 (the free edition). Without them the inbox is not registered and the rest of the package keeps working.
+
+- q: Which PHP and Laravel versions are supported?
+  a: PHP 8.2 or higher and Laravel 11, 12 and 13.
+
+- q: How do I check that mail works on a server?
+  a: Run `php artisan mailtrap:test you@example.com`. It sends a test mail and exits with code 0 when the mail went out.
+
+- q: Is darvis/mailtrap an official Mailtrap package?
+  a: No. It is an independent open-source package under the MIT license, maintained by ARVID.NL.

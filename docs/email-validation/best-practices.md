@@ -1,3 +1,10 @@
+---
+title: "Best practices"
+description: "Performance, error handling and testing when validating email addresses with darvis/mailtrap."
+nav_order: 6
+parent: "Email validation"
+---
+
 # Best Practices
 
 Performance optimization, error handling, and maintenance guidelines for the EmailValidation model.

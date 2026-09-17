@@ -1,3 +1,9 @@
+---
+title: "Inbox UI & health check"
+description: "The Livewire and Flux inbox for inspecting logged mail in Laravel, and the mailtrap:test health check command."
+nav_order: 5
+---
+
 # Inbox UI & Health Check
 
 ## Inbox UI

@@ -1,3 +1,10 @@
+---
+title: "Practical examples"
+description: "Email validation examples for newsletters, registration forms, imports and list cleanup in Laravel."
+nav_order: 5
+parent: "Email validation"
+---
+
 # Practical Examples
 
 Real-world use cases and implementation examples for the EmailValidation model.

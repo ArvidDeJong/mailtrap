@@ -1,3 +1,10 @@
+---
+title: "Laravel collections"
+description: "Filter and transform bulk email validation results with Laravel collections."
+nav_order: 3
+parent: "Email validation"
+---
+
 # Laravel Collections
 
 Laravel's `collect()` function is a powerful way to filter and manipulate bulk validation results. Here are the most commonly used methods:

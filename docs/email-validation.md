@@ -1,3 +1,10 @@
+---
+title: "Email validation"
+description: "Validate email addresses in Laravel before sending, with the EmailValidation model of darvis/mailtrap."
+nav_order: 6
+has_children: true
+---
+
 # EmailValidation Model Documentation
 
 The `EmailValidation` model provides comprehensive functionality for validating and managing email addresses. This model tracks which email addresses are valid, which are blocked, and why.

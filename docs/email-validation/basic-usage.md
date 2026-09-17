@@ -1,3 +1,10 @@
+---
+title: "Basic usage"
+description: "Validate a single email address with EmailValidation, and the structure of the email_validations table."
+nav_order: 1
+parent: "Email validation"
+---
+
 # Basic Usage & Database Structure
 
 ## Overview
