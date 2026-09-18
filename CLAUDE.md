@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. The conventions shared by every darvis package (language, releases, CI, docs site, Boost guidelines, public API policy) are in [../CLAUDE.md](../CLAUDE.md); this file only holds what is specific to this package.
 
 ## Package overview
 
@@ -22,7 +22,7 @@ composer lint                 # Pint (check only); composer format fixes
 composer analyse              # Larastan, level 5
 ```
 
-CI (`.github/workflows/tests.yml`) runs PHP 8.2–8.4 × Laravel 11/12/13 × lowest/stable. It turns off Composer's advisory blocking, because every Laravel 11 release has an open advisory. The inbox needs Flux ≥ 2.11 (free `card`/`table`); the lowest-dependency legs catch that kind of floor. The test app loads the Livewire and Flux providers; `LivewireNotLoadedTest` covers a host without them.
+The inbox needs Flux ≥ 2.11 (free `card`/`table`); the lowest-dependency legs catch that kind of floor. The test app loads the Livewire and Flux providers; `LivewireNotLoadedTest` covers a host without them.
 
 Tests use Orchestra Testbench with an in-memory SQLite database; migrations are loaded manually in [TestCase::runPackageMigrations()](tests/TestCase.php) (not via `loadMigrationsFrom`), so **when adding a new migration, also add it to that array** or Pest tests against it will fail with "no such table" — and, worse, the migration itself goes untested (this is how the MySQL-only `SHOW INDEX` in `000003` survived until 1.0.15).
 
@@ -85,11 +85,8 @@ Captures `debug_backtrace` to record `source_file` and `source_line` of the call
 
 ## Conventions specific to this package
 
-- `docs/` is also the GitHub Pages site (Jekyll, Just the Docs, `docs/_config.yml`); `docs/README.md` is only for browsing on GitHub and is excluded from the site. Every page needs `title`, `description` and `nav_order` front matter; pages under `docs/email-validation/` also need `parent: "Email validation"`. Quote front matter values: an unquoted `: ` makes Jekyll silently drop the whole block. Don't write `{{ }}` or `{% %}` in code examples; Liquid is intended only in `faq.md`, `llms.txt` and `_includes/`. Package facts live in `docs/_config.yml` (`package`, `developer`) and FAQ answers in `docs/_data/faq.yml`; the pages, the structured data and `llms.txt` read from there. The footer credit is `ARVID.NL` only. The site says the package is not an official Mailtrap product; keep it that way and don't use Mailtrap's logo. `tests/DocsSiteTest.php` guards these rules.
-- `resources/boost/` holds the Laravel Boost guideline and the `mailtrap-development` skill that host apps receive. Update them when public behaviour, commands or config change.
-- Keep the public API compatible within 1.x. Don't add return types to existing public methods that host apps may override, and don't change `$casts` into `casts()`. Deprecate first and remove in 2.0.
+- `docs/README.md` is only for browsing on GitHub and is excluded from the site. Pages under `docs/email-validation/` also need `parent: "Email validation"`. The site says the package is not an official Mailtrap product; keep it that way and don't use Mailtrap's logo. `tests/DocsSiteTest.php` guards these rules.
+- `resources/boost/` also holds the `mailtrap-development` skill.
+- Don't change `$casts` into `casts()`; host apps may override it.
 
 - Config file stays as `config/manta_mailtrap.php` with that exact name (do not rename to `mailtrap.php`).
-- Everything is in English: comments, log and exception messages, command output and the inbox UI. README and CHANGELOG too.
-- Don't introduce Doctrine DBAL — Laravel 11+ compatibility depends on its absence. Use the native schema builder (`Schema::hasColumn`, `Schema::hasTable`, `Schema::getIndexes`) for schema checks. Never reach for driver-specific SQL such as `SHOW INDEX`: host apps run their tests on SQLite, where it is a syntax error.
-- The webhook controller extends `Illuminate\Routing\Controller` (not an app-level base controller) so the package works without the host app's `App\Http\Controllers\Controller`.
