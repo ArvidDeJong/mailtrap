@@ -2,6 +2,7 @@
 
 namespace Darvis\Mailtrap\Services;
 
+use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -77,11 +78,11 @@ class MailtrapWebhookApi
 
     private function request(): PendingRequest
     {
-        return Http::baseUrl((string) config('manta_mailtrap.api.account_url', 'https://mailtrap.io'))
+        return Http::baseUrl(MailtrapConfig::apiAccountUrl())
             ->withHeaders(['Api-Token' => $this->token])
             ->acceptJson()
             ->asJson()
-            ->timeout((int) config('manta_mailtrap.api.timeout', 30));
+            ->timeout(MailtrapConfig::apiTimeout());
     }
 
     private function check(Response $response): Response

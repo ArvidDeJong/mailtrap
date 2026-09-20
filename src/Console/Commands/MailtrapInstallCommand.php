@@ -4,6 +4,7 @@ namespace Darvis\Mailtrap\Console\Commands;
 
 use Darvis\Mailtrap\Console\Commands\Concerns\WritesEnvironment;
 use Darvis\Mailtrap\Services\MailtrapWebhookApi;
+use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -476,9 +477,9 @@ class MailtrapInstallCommand extends Command
             'your sender reputation, so bad addresses are blocked by default.',
         ]));
 
-        $current = ! config('manta_mailtrap.validation.enabled', true)
+        $current = ! MailtrapConfig::validationEnabled()
             ? 'off'
-            : (config('manta_mailtrap.validation.block_invalid', true) ? 'block' : 'log');
+            : (MailtrapConfig::blockInvalid() ? 'block' : 'log');
 
         $choice = select('How should recipients be checked?', [
             'block' => 'Check and block bad addresses (recommended)',
@@ -514,15 +515,15 @@ class MailtrapInstallCommand extends Command
             return true;
         }
 
-        $path = '/'.ltrim((string) config('manta_mailtrap.ui.route', 'mailtrap'), '/');
+        $path = MailtrapConfig::uiPath();
 
         note(implode("\n", [
             "The inbox page at {$path} lists every outgoing mail with its recipients and",
             'subject. That is personal data, so the page must not be public.',
         ]));
 
-        $middleware = (array) config('manta_mailtrap.ui.middleware', ['web']);
-        $current = ! config('manta_mailtrap.ui.enabled', true)
+        $middleware = MailtrapConfig::uiMiddleware();
+        $current = ! MailtrapConfig::uiEnabled()
             ? 'off'
             : ($middleware === ['web'] || $middleware === ['web', 'auth'] ? 'auth' : 'custom');
 
@@ -558,7 +559,7 @@ class MailtrapInstallCommand extends Command
             $this->components->warn('This app has no route named "login", so a guest gets an error page instead of a login form.');
         }
 
-        $layout = (string) config('manta_mailtrap.ui.layout', 'components.layouts.app');
+        $layout = MailtrapConfig::uiLayout();
 
         if (! view()->exists($layout)) {
             $layout = text(
@@ -683,7 +684,7 @@ class MailtrapInstallCommand extends Command
     private function showCurrentState(): void
     {
         $token = $this->currentApiToken();
-        $secret = (string) config('manta_mailtrap.webhook.secret');
+        $secret = MailtrapConfig::webhookSecret();
         $isInstalled = $token !== null || $secret !== '' || $this->environmentFile()->get('MAILTRAP_WEBHOOK_ENABLED') !== null;
 
         $this->components->info($isInstalled ? 'Reconfiguring darvis/mailtrap' : 'Installing darvis/mailtrap');
@@ -693,9 +694,9 @@ class MailtrapInstallCommand extends Command
         }
 
         $this->components->twoColumnDetail('API token', $token ? 'set (…'.substr($token, -4).')' : '<fg=yellow>not set</>');
-        $this->components->twoColumnDetail('Webhook endpoint', config('manta_mailtrap.webhook.enabled') ? 'enabled' : 'disabled');
+        $this->components->twoColumnDetail('Webhook endpoint', MailtrapConfig::webhookEnabled() ? 'enabled' : 'disabled');
         $this->components->twoColumnDetail('Signing secret', $secret !== '' ? 'set' : '<fg=yellow>not set</>');
-        $this->components->twoColumnDetail('Signature check', config('manta_mailtrap.webhook.verify_signature', true) ? 'on' : '<fg=yellow>off</>');
+        $this->components->twoColumnDetail('Signature check', MailtrapConfig::webhookVerifySignature() ? 'on' : '<fg=yellow>off</>');
 
         if ($this->laravel->configurationIsCached() && (string) $this->environmentFile()->get('MAILTRAP_WEBHOOK_SECRET') !== $secret) {
             $this->components->warn('The cached configuration holds a different signing secret than .env. It is rebuilt when this command writes .env.');
@@ -706,7 +707,7 @@ class MailtrapInstallCommand extends Command
 
     private function currentApiToken(): ?string
     {
-        $token = config('manta_mailtrap.api.token') ?: $this->environmentFile()->get('MAILTRAP_API_TOKEN');
+        $token = MailtrapConfig::apiToken() ?: $this->environmentFile()->get('MAILTRAP_API_TOKEN');
 
         return $token ? (string) $token : null;
     }

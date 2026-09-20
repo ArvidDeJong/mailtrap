@@ -2,6 +2,7 @@
 
 namespace Darvis\Mailtrap\Models;
 
+use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -249,7 +250,7 @@ class EmailValidation extends Model
             return false;
         }
 
-        $cacheDuration = (int) config('manta_mailtrap.validation.cache_duration', 3600);
+        $cacheDuration = MailtrapConfig::validationCacheDuration();
 
         if ($cacheDuration <= 0) {
             return false;

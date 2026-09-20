@@ -38,7 +38,7 @@ class PackageLog
      */
     private static function write(string $level, string $message, array $context): void
     {
-        if (config('manta_mailtrap.logging.log_to_laravel', false)) {
+        if (MailtrapConfig::logToLaravel()) {
             Log::log($level, $message, $context);
         }
     }

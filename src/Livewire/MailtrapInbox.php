@@ -3,6 +3,7 @@
 namespace Darvis\Mailtrap\Livewire;
 
 use Darvis\Mailtrap\Models\MailLog;
+use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Computed;
@@ -64,7 +65,7 @@ class MailtrapInbox extends Component
 
     public function cleanup(): void
     {
-        $days = (int) config('manta_mailtrap.logging.cleanup_after_days', 30);
+        $days = MailtrapConfig::cleanupAfterDays();
 
         $deleted = (new MailLog)->prunable()->delete();
 
@@ -135,7 +136,7 @@ class MailtrapInbox extends Component
     #[Computed]
     public function logs(): LengthAwarePaginator
     {
-        $perPage = (int) config('manta_mailtrap.ui.per_page', 25);
+        $perPage = MailtrapConfig::uiPerPage();
 
         return MailLog::query()
             ->when($this->search !== '', function ($query): void {
@@ -163,6 +164,6 @@ class MailtrapInbox extends Component
     public function render()
     {
         return view('mailtrap::livewire.inbox')
-            ->layout(config('manta_mailtrap.ui.layout', 'components.layouts.app'));
+            ->layout(MailtrapConfig::uiLayout());
     }
 }
