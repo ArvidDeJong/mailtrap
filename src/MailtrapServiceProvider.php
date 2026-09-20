@@ -9,6 +9,7 @@ use Darvis\Mailtrap\Http\Middleware\VerifyMailtrapWebhookSignature;
 use Darvis\Mailtrap\Livewire\MailtrapInbox;
 use Darvis\Mailtrap\Providers\MailServiceProvider;
 use Darvis\Mailtrap\Services\MailtrapService;
+use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
@@ -83,7 +84,7 @@ class MailtrapServiceProvider extends ServiceProvider
      */
     protected function registerWebhookRoute(): void
     {
-        if (! config('manta_mailtrap.webhook.enabled', true)) {
+        if (! MailtrapConfig::webhookEnabled()) {
             return;
         }
 
@@ -102,7 +103,7 @@ class MailtrapServiceProvider extends ServiceProvider
      */
     protected function registerInboxUi(): void
     {
-        if (! config('manta_mailtrap.ui.enabled', true)) {
+        if (! MailtrapConfig::uiEnabled()) {
             return;
         }
 
@@ -115,8 +116,8 @@ class MailtrapServiceProvider extends ServiceProvider
         // Register the route once every provider has booted, so Livewire's
         // Route::livewire() macro is guaranteed to be available.
         $this->app->booted(function (): void {
-            $path = '/'.ltrim((string) config('manta_mailtrap.ui.route', 'mailtrap'), '/');
-            $middleware = config('manta_mailtrap.ui.middleware', ['web']);
+            $path = MailtrapConfig::uiPath();
+            $middleware = MailtrapConfig::uiMiddleware();
 
             $route = Route::hasMacro('livewire')
                 ? Route::livewire($path, MailtrapInbox::class)

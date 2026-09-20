@@ -2,6 +2,7 @@
 
 namespace Darvis\Mailtrap\Models;
 
+use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
@@ -126,7 +127,7 @@ class MailLog extends Model
      */
     public function prunable(): Builder
     {
-        $days = (int) config('manta_mailtrap.logging.cleanup_after_days', 30);
+        $days = MailtrapConfig::cleanupAfterDays();
 
         return $days > 0
             ? static::where('created_at', '<', now()->subDays($days))

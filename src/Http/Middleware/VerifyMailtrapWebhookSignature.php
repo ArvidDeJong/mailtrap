@@ -3,6 +3,7 @@
 namespace Darvis\Mailtrap\Http\Middleware;
 
 use Closure;
+use Darvis\Mailtrap\Support\MailtrapConfig;
 use Darvis\Mailtrap\Support\PackageLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -28,11 +29,11 @@ class VerifyMailtrapWebhookSignature
      */
     public function handle(Request $request, Closure $next): SymfonyResponse
     {
-        if (! config('manta_mailtrap.webhook.verify_signature', true)) {
+        if (! MailtrapConfig::webhookVerifySignature()) {
             return $next($request);
         }
 
-        $secret = (string) config('manta_mailtrap.webhook.secret', '');
+        $secret = MailtrapConfig::webhookSecret();
 
         // Fail closed: an unset secret means the endpoint cannot be trusted, and
         // waving requests through would leave it open to anyone who knows the URL.

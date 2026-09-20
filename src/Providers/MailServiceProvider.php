@@ -5,6 +5,7 @@ namespace Darvis\Mailtrap\Providers;
 use Darvis\Mailtrap\Events\MailBlocked;
 use Darvis\Mailtrap\Models\EmailValidation;
 use Darvis\Mailtrap\Models\MailLog;
+use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Mail\Events\MessageSent;
@@ -44,11 +45,10 @@ class MailServiceProvider extends ServiceProvider
                 'model_id' => $modelId === null ? null : (int) $modelId,
             ];
 
-            $validationEnabled = (bool) config('manta_mailtrap.validation.enabled', true);
-            $blockInvalid = (bool) config('manta_mailtrap.validation.block_invalid', true);
-            $loggingEnabled = (bool) config('manta_mailtrap.logging.enabled', true);
-            $logSuccessful = $loggingEnabled && config('manta_mailtrap.logging.log_successful', true);
-            $logFailed = $loggingEnabled && config('manta_mailtrap.logging.log_failed', true);
+            $validationEnabled = MailtrapConfig::validationEnabled();
+            $blockInvalid = MailtrapConfig::blockInvalid();
+            $logSuccessful = MailtrapConfig::logSuccessful();
+            $logFailed = MailtrapConfig::logFailed();
 
             // Cc and Bcc count too: a blocked address must not slip through as a hidden copy.
             $recipients = collect([...$message->getTo(), ...$message->getCc(), ...$message->getBcc()])
@@ -99,7 +99,7 @@ class MailServiceProvider extends ServiceProvider
         });
 
         Event::listen(function (MessageSent $event): void {
-            if (! config('manta_mailtrap.logging.enabled', true)) {
+            if (! MailtrapConfig::loggingEnabled()) {
                 return;
             }
 

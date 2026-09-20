@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation site** on GitHub Pages: https://arviddejong.github.io/mailtrap/, built from `docs/`, with an FAQ, a description per page, sitemap, `llms.txt` and structured data.
 - `CONTRIBUTING.md`, `SECURITY.md` with private vulnerability reporting, `CODE_OF_CONDUCT.md`, issue and pull request templates, and Dependabot.
 - README badges for downloads and license.
+- **`MailtrapConfig` with named accessors** is the one place that reads the package config.
+  Every default is written down once, so a caller cannot quietly disagree with the config
+  file about what it is. Thirty-three reads spread over eleven files now go through it,
+  including the inbox Blade view. `MailtrapConfig::uiPath()` gives the inbox route with its
+  leading slash, so the service provider and `mailtrap:install` cannot drift apart.
+  The deprecated keys (`api.base_url`, `validation.retry_attempts`, `rate_limiting` and
+  `development`) get no accessor: the package does not read them and they go in 2.0.
+
+### Changed
+
+- The config keys are in alphabetical order, both the groups and the keys inside them.
+  No key, default or behaviour changed.
 
 ## [1.4.1] - 2026-09-16
 

@@ -4,6 +4,7 @@ namespace Darvis\Mailtrap\Console\Commands;
 
 use Darvis\Mailtrap\Console\Commands\Concerns\WritesEnvironment;
 use Darvis\Mailtrap\Services\MailtrapWebhookApi;
+use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Console\Command;
 use RuntimeException;
 
@@ -121,7 +122,7 @@ class MailtrapWebhookCommand extends Command
     private function apiToken(): ?string
     {
         $token = $this->option('token')
-            ?: config('manta_mailtrap.api.token')
+            ?: MailtrapConfig::apiToken()
             ?: $this->environmentFile()->get('MAILTRAP_API_TOKEN');
 
         return $token ? (string) $token : null;

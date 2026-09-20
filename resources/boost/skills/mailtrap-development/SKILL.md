@@ -74,13 +74,15 @@ Event::listen(function (MailBlocked $event): void {
 - Webhook requests must be signed. Sign the raw JSON body with HMAC-SHA256 and send it in the `Mailtrap-Signature` header:
 
 ```php
+use Darvis\Mailtrap\Support\MailtrapConfig;
+
 $body = json_encode(['events' => [[
     'event' => 'bounce', 'email' => 'a@example.org', 'message_id' => 'abc', 'response_code' => 550,
 ]]]);
 
 $this->call('POST', '/api/webhooks/mailtrap', server: [
     'CONTENT_TYPE' => 'application/json',
-    'HTTP_MAILTRAP_SIGNATURE' => hash_hmac('sha256', $body, config('manta_mailtrap.webhook.secret')),
+    'HTTP_MAILTRAP_SIGNATURE' => hash_hmac('sha256', $body, MailtrapConfig::webhookSecret()),
 ], content: $body)->assertOk();
 ```
 

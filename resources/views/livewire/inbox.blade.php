@@ -1,3 +1,5 @@
+@use('Darvis\Mailtrap\Support\MailtrapConfig')
+
 <div class="mx-auto max-w-7xl space-y-6 p-6">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -8,7 +10,7 @@
             <flux:button wire:click="$refresh" icon="arrow-path" variant="ghost">Refresh</flux:button>
             <flux:button
                 wire:click="cleanup"
-                wire:confirm="Delete all logs older than {{ (int) config('manta_mailtrap.logging.cleanup_after_days', 30) }} days?"
+                wire:confirm="Delete all logs older than {{ MailtrapConfig::cleanupAfterDays() }} days?"
                 icon="trash"
                 variant="subtle"
             >Clean up</flux:button>
