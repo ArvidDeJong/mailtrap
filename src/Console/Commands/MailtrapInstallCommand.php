@@ -80,6 +80,8 @@ class MailtrapInstallCommand extends Command
 
         $this->publishConfig();
 
+        $this->explainInboxGate();
+
         if (! $this->option('skip-migrations')) {
             $this->call('migrate', ['--force' => true]);
         }
@@ -520,6 +522,10 @@ class MailtrapInstallCommand extends Command
         note(implode("\n", [
             "The inbox page at {$path} lists every outgoing mail with its recipients and",
             'subject. That is personal data, so the page must not be public.',
+            '',
+            'Two checks guard it. The middleware you choose here runs first, for example the login.',
+            'Then the viewMailtrap gate decides who of those visitors may open the page. Without a',
+            'gate of your own, only the local environment is allowed: on a live site everyone gets 403.',
         ]));
 
         $middleware = MailtrapConfig::uiMiddleware();
@@ -665,6 +671,8 @@ class MailtrapInstallCommand extends Command
             });
         }
 
+        $this->explainInboxGate();
+
         $this->newLine();
         $this->components->bulletList([
             '.env is not in git: run this wizard on every server as well.',
@@ -759,6 +767,24 @@ class MailtrapInstallCommand extends Command
     private function inboxAvailable(): bool
     {
         return class_exists(Livewire::class) && $this->laravel->bound('livewire');
+    }
+
+    /**
+     * The inbox answers 403 outside the local environment until the host defines
+     * the gate, and no setting in .env can change that. Say so, with the code.
+     */
+    private function explainInboxGate(): void
+    {
+        if (! $this->inboxAvailable() || ! MailtrapConfig::uiEnabled()) {
+            return;
+        }
+
+        $this->newLine();
+        $this->components->warn('The inbox at '.MailtrapConfig::uiPath().' answers 403 outside the local environment until you say who may open it. Add this to the boot() method of app/Providers/AppServiceProvider.php and adapt the condition to your users:');
+        $this->line('  use App\\Models\\User;');
+        $this->line('  use Illuminate\\Support\\Facades\\Gate;');
+        $this->newLine();
+        $this->line("  Gate::define('viewMailtrap', fn (?User \$user) => \$user?->is_admin === true);");
     }
 
     private function mailLogTableExists(): bool

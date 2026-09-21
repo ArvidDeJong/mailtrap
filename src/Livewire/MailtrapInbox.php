@@ -2,6 +2,7 @@
 
 namespace Darvis\Mailtrap\Livewire;
 
+use Darvis\Mailtrap\Http\Middleware\AuthorizeInbox;
 use Darvis\Mailtrap\Models\MailLog;
 use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -36,6 +37,16 @@ class MailtrapInbox extends Component
 
     public ?string $notice = null;
 
+    /**
+     * Runs on the page load and on every update request. It also covers the
+     * component when a host application embeds it outside the package route,
+     * where the route middleware never runs.
+     */
+    public function boot(): void
+    {
+        AuthorizeInbox::authorize();
+    }
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -48,12 +59,16 @@ class MailtrapInbox extends Component
 
     public function select(int $id): void
     {
+        AuthorizeInbox::authorize();
+
         $this->selectedId = $id;
         $this->showDetail = true;
     }
 
     public function deleteLog(int $id): void
     {
+        AuthorizeInbox::authorize();
+
         MailLog::whereKey($id)->delete();
 
         if ($this->selectedId === $id) {
@@ -65,6 +80,8 @@ class MailtrapInbox extends Component
 
     public function cleanup(): void
     {
+        AuthorizeInbox::authorize();
+
         $days = MailtrapConfig::cleanupAfterDays();
 
         $deleted = (new MailLog)->prunable()->delete();
@@ -76,6 +93,8 @@ class MailtrapInbox extends Component
 
     public function sendTest(): void
     {
+        AuthorizeInbox::authorize();
+
         $this->validate([
             'testEmail' => ['required', 'email'],
         ]);
@@ -163,6 +182,8 @@ class MailtrapInbox extends Component
 
     public function render()
     {
+        AuthorizeInbox::authorize();
+
         return view('mailtrap::livewire.inbox')
             ->layout(MailtrapConfig::uiLayout());
     }

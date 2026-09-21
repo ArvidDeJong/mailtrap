@@ -77,6 +77,7 @@ it('walks a live site through mailer, webhook, validation and inbox', function (
         ->expectsChoice('Who may open the inbox?', 'auth', INBOX_CHOICES)
         ->expectsQuestion('The layout components.layouts.app does not exist. Which Blade layout do your pages use?', '')
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
+        ->expectsOutputToContain("Gate::define('viewMailtrap', fn (?User \$user) => \$user?->is_admin === true);")
         ->assertSuccessful();
 
     Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
