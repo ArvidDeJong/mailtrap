@@ -1,62 +1,82 @@
 ---
-title: "Sending, blocking & mail logs"
-description: "What happens when a Laravel app sends mail with darvis/mailtrap: validation states, blocking per address, linking logs to models, pruning, events and other mailers."
-nav_order: 3
+title: "Sending, blocking and mail logs"
+description: "What darvis/mailtrap does on every send in Laravel: the recipient check, which verdict stops a mail, the mail_logs columns and scopes, pruning, events."
+nav_order: 4
 ---
 
-# Sending, Blocking & Mail Logs
+# Sending, blocking and mail logs
 
-The package listens to Laravel's `MessageSending` and `MessageSent` events. Every
-outgoing mail is validated and logged, whatever mailer it goes through.
+The package listens to Laravel's `MessageSending` and `MessageSent` events. Every outgoing mail is validated and logged, whatever mailer it goes through. You do not call the package to send mail.
 
-## What happens on send
+## What happens when a mail is sent
 
-For every To, Cc and Bcc recipient:
+Before the mail goes out (`MessageSending`), for every To, Cc and Bcc address:
 
-1. The address is validated: format, then an MX record that resolves to an IP. A
-   previous verdict from the database is reused while it is fresh. Set
-   `MAILTRAP_VALIDATION_ENABLED=false` to skip this; the DNS lookups run synchronously
-   during the send.
-2. A `blocked` address aborts the whole send with a
-   `Symfony\Component\Mailer\Exception\TransportException`, after a `MailBlocked` event.
-   Set `MAILTRAP_BLOCK_INVALID_EMAILS=false` to send anyway and only log the reason.
-3. Otherwise a `MailLog` row is created. It is marked sent once `MessageSent` fires.
+1. The address is validated with `EmailValidation::validateEmail()`: the format, then a DNS lookup for a mail server (MX record) that resolves to an IP address. A verdict that is already in the database is reused. The lookups run synchronously during the send. Set `MAILTRAP_VALIDATION_ENABLED=false` to skip this step.
+2. If the address has the verdict `blocked`, the whole send is aborted. A log row with status `550` is written, the `MailBlocked` event is dispatched, and a `Symfony\Component\Mailer\Exception\TransportException` is thrown with the message `Email address {email} is blocked: {reason}`. Set `MAILTRAP_BLOCK_INVALID_EMAILS=false` to send anyway; the reason is then kept in `error_message` of a normal log row.
+3. Otherwise one `mail_logs` row is created for that recipient, with `status_code` `null` (pending).
 
-## Validation states
+After the mailer accepted the mail (`MessageSent`), every pending row of that message gets status `200`.
 
-| Status | Set by | Blocks sending? |
-| --- | --- | --- |
-| `valid` | Passed the checks, or a `delivery`/`open`/`click` webhook event | No |
-| `invalid` | A `bounce`, `spam` or `reject` webhook event | No |
-| `blocked` | A failed local check, or `markAsBlocked()` | Yes |
+All rows of one mail share one message id. The package puts it in the `X-Message-ID` header (an existing `X-Message-ID` header is reused) and sends it to Mailtrap as the custom variable `x_message_id`, so [webhook events](./webhook.md) find the right row.
 
-Blocking is per address: a typo or a manual block never stops mail to the rest of the
-domain. Blocks from a local check expire after `MAILTRAP_VALIDATION_CACHE_DURATION`, so a
-temporary DNS outage does not block an address for good. Manual blocks are permanent.
+## Which verdict stops a send
+
+Each address has at most one row in `email_validations`. Its `status` is the verdict.
+
+| Verdict | Constant | Set by | Stops a send? |
+| --- | --- | --- | --- |
+| `valid` | `EmailValidation::VALID` | Passed the local checks, a `delivery`, `open` or `click` webhook event, or `markAsValid()` | No |
+| `invalid` | `EmailValidation::INVALID` | A `bounce`, `spam` or `reject` webhook event, or `markAsInvalid()` | No |
+| `blocked` | `EmailValidation::BLOCKED` | A failed local check (format or DNS), or `markAsBlocked()` | Yes |
+
+- Blocking is per address. A blocked address never stops mail to other addresses on the same domain.
+- A block from a local check expires after `MAILTRAP_VALIDATION_CACHE_DURATION` seconds (default 3600). The address is then checked again, so a DNS outage does not block it for good.
+- A block set with `markAsBlocked()` never expires. Remove it with `markAsValid()`.
 
 ```php
 use Darvis\Mailtrap\Models\EmailValidation;
 
-$error = EmailValidation::validateEmail('test@example.com'); // null when valid
-
 // Stop all mail to one address.
 EmailValidation::markAsBlocked('complainer@example.com', 'Spam complaint');
+
+// Allow it again.
+EmailValidation::markAsValid('complainer@example.com');
 ```
 
-More in the [EmailValidation documentation](./email-validation.md).
+All methods are on [Email validation](./email-validation.md).
 
-> **Deprecated:** `MailtrapService` and `app('mailtrap')` call a Mailtrap validation
-> endpoint that does not exist, so `validateEmail()` there cannot succeed. They are
-> removed in 2.0. Use `EmailValidation::validateEmail()` instead.
+## The columns of a mail log
 
-## Linking a log to a model
+`Darvis\Mailtrap\Models\MailLog` is one row per recipient in the `mail_logs` table.
 
-Tag a Mailable with headers:
+| Column | Contents |
+| --- | --- |
+| `message_id` | The id shared by all recipients of one mail |
+| `sender` | The From address |
+| `recipient` | One To, Cc or Bcc address |
+| `subject` | The subject. The column is required: a mail without a subject fails, see [troubleshooting](./troubleshooting.md#a-mail-without-a-subject-fails). |
+| `status_code` | `null` pending, `"200"` sent (`MailLog::STATUS_SENT`), `"550"` blocked (`MailLog::STATUS_BLOCKED`), or the response code of a webhook event |
+| `error_message` | The block reason, or the response text of a bounce, spam or reject event |
+| `source_file`, `source_line` | Filled only for a blocked send. In the current version they point at Laravel's event dispatcher, not at the code that sent the mail. |
+| `type` | The `X-Mail-Type` header, or `webhook` for a row created by a webhook event |
+| `model`, `model_id` | The `X-Mail-Model` and `X-Mail-Model-ID` headers |
+
+The body of the mail is not stored.
+
+## Link a log to a model
+
+Add three headers to the mailable. `X-Mail-Model` is a class name or a morph alias.
 
 ```php
-public function headers(): \Illuminate\Mail\Mailables\Headers
+// app/Mail/InvoiceMail.php, inside the class
+
+use App\Models\Invoice;
+use Illuminate\Mail\Mailables\Headers;
+
+public function headers(): Headers
 {
-    return new \Illuminate\Mail\Mailables\Headers(text: [
+    return new Headers(text: [
         'X-Mail-Type' => 'invoice',
         'X-Mail-Model' => Invoice::class,
         'X-Mail-Model-ID' => (string) $this->invoice->id,
@@ -64,34 +84,63 @@ public function headers(): \Illuminate\Mail\Mailables\Headers
 }
 ```
 
-Then query the logs:
+A complete mailable is in the [quick start](./quickstart.md).
+
+## Query the mail logs
+
+Use the scopes (named query filters) instead of comparing status codes yourself.
+
+| Scope | Rows |
+| --- | --- |
+| `successful()` | `status_code` is `"200"` |
+| `pending()` | `status_code` is `null` |
+| `failed()` | Any status other than `null` and `"200"`, so blocked rows too |
+| `blocked()` | `status_code` is `"550"` |
+| `forModel(string $model, ?int $modelId = null)` | Logs of one model class, or one model |
+| `toRecipient(string $email)` | Logs to one address |
+| `fromSender(string $email)` | Logs from one address |
 
 ```php
+use App\Models\Invoice;
 use Darvis\Mailtrap\Models\MailLog;
 
 MailLog::forModel(Invoice::class, $invoice->id)->failed()->get();
-MailLog::pending()->count();   // also: successful(), blocked()
-$log->related;                 // the Invoice
+MailLog::toRecipient('user@example.com')->latest('id')->first();
+MailLog::pending()->count();
+
+$log->related; // the Invoice, through the model and model_id columns
 ```
 
-## Cleaning up old logs
+A bounce that Mailtrap reports with response code 550 gets the same status as a blocked send, so `blocked()` returns both. Read `error_message` to tell them apart.
 
-Logs older than `MAILTRAP_CLEANUP_AFTER_DAYS` are removed by Laravel's pruning. Package
-models are not discovered automatically, so schedule it explicitly:
+## Remove old logs
+
+`MailLog` uses Laravel's `MassPrunable`. Logs older than `MAILTRAP_CLEANUP_AFTER_DAYS` (default 30) are deleted by `model:prune`. Laravel only finds models in `app/Models` by itself, so name the model:
 
 ```php
 // routes/console.php
-Schedule::command('model:prune', ['--model' => [\Darvis\Mailtrap\Models\MailLog::class]])->daily();
+
+use Darvis\Mailtrap\Models\MailLog;
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('model:prune', ['--model' => [MailLog::class]])->daily();
 ```
 
-## Events
+With `MAILTRAP_CLEANUP_AFTER_DAYS=0` nothing is deleted. The Cleanup button in the [inbox](./inbox.md) deletes the same rows.
+
+## React to a blocked send or a webhook event
 
 | Event | When | Properties |
 | --- | --- | --- |
-| `Darvis\Mailtrap\Events\MailBlocked` | Just before a send to a blocked address is aborted | `email`, `reason`, `message`, `mailLog` |
-| `Darvis\Mailtrap\Events\MailtrapEventReceived` | For every signed webhook event, also the ones the package ignores | `type`, `email`, `payload`, `mailLog` |
+| `Darvis\Mailtrap\Events\MailBlocked` | Right before a send to a blocked address is aborted | `email`, `reason`, `message` (the Symfony `Email`), `mailLog` (`null` when `MAILTRAP_LOG_FAILED=false`) |
+| `Darvis\Mailtrap\Events\MailtrapEventReceived` | For every event in a webhook call that was accepted (see [signature checking](./webhook.md#how-the-signature-is-checked)), after the package processed it | `type`, `email`, `payload` (the event as Mailtrap sent it), `mailLog` (`null` for types the package does not act on) |
+
+`MailtrapEventReceived` is also dispatched for types the package does nothing with, such as `unsubscribe`, `soft bounce` and `suspension`. It is not dispatched for an event without an `email` or `event` field, for a duplicate inside one call, or for an event the package failed to store.
 
 ```php
+// app/Providers/AppServiceProvider.php, inside boot()
+
+use App\Models\User;
 use Darvis\Mailtrap\Events\MailtrapEventReceived;
 use Illuminate\Support\Facades\Event;
 
@@ -102,28 +151,26 @@ Event::listen(function (MailtrapEventReceived $event): void {
 });
 ```
 
-A listener that throws is logged (with `MAILTRAP_LOG_TO_LARAVEL=true`) and does not stop
-the rest of the webhook batch.
+The `newsletter` column is an example from your own app. A listener that throws does not stop the rest of the webhook call; the error is written to the Laravel log when `MAILTRAP_LOG_TO_LARAVEL=true`.
 
-## Other mailers
+## What works without Mailtrap
 
-Validation and logging work with any transport: Mailtrap SMTP, Microsoft Graph, Amazon
-SES or any other Laravel mailer. Delivery feedback is the exception, because only
-Mailtrap reports it through the [webhook](./webhook.md).
+Validation and logging work with any Laravel mailer. Delivery feedback is the exception, because only Mailtrap sends the [webhook](./webhook.md) events.
 
-| Capability | Any mailer | Mailtrap only |
+| Capability | Any mailer | Needs Mailtrap |
 | --- | :---: | :---: |
-| Pre-send validation (format / MX / blocklist) | ✅ | |
-| Outgoing mail logging | ✅ | |
-| Inbox UI & `mailtrap:test` health check | ✅ | |
-| Delivery / open / click → `markAsValid` | | ✅ |
-| Bounce / spam / reject → `markAsInvalid` | | ✅ |
+| Recipient check before sending (format, DNS, manual blocks) | Yes | |
+| Mail logs | Yes | |
+| Inbox page and `mailtrap:test` | Yes | |
+| `delivery`, `open`, `click` events mark an address `valid` | | Yes |
+| `bounce`, `spam`, `reject` events mark an address `invalid` | | Yes |
 
-So you can route production mail through Microsoft Graph and still get full logging and
-the inbox. Only the feedback loop (confirming good addresses, flagging bounces) needs
-Mailtrap.
+## Deprecated: MailtrapService
 
-## Next Steps
+`Darvis\Mailtrap\Services\MailtrapService` and `app('mailtrap')` are deprecated since 1.2.0 and removed in 2.0. Nothing in the package calls them. Use `EmailValidation::validateEmail()` instead.
 
+## Next steps
+
+- [Email validation](./email-validation.md)
 - [Webhook](./webhook.md)
-- [Inbox UI & Health Check](./inbox.md)
+- [Testing](./testing.md)

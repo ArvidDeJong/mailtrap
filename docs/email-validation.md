@@ -1,125 +1,198 @@
 ---
 title: "Email validation"
-description: "Validate email addresses in Laravel before sending, with the EmailValidation model of darvis/mailtrap."
-nav_order: 6
-has_children: true
+description: "Check an email address in Laravel with the EmailValidation model: format and MX lookup, blocking one address, the status of a list, and every method."
+nav_order: 5
 ---
 
-# EmailValidation Model Documentation
+# Email validation
 
-The `EmailValidation` model provides comprehensive functionality for validating and managing email addresses. This model tracks which email addresses are valid, which are blocked, and why.
+`Darvis\Mailtrap\Models\EmailValidation` keeps one verdict per address in the `email_validations` table. The package calls it for every recipient while sending. You can also call it yourself, for example in a form or an import.
 
-## 📚 Documentation Chapters
+## What is checked
 
-This documentation is organized into focused chapters for better navigation and maintenance:
+`EmailValidation::validateEmail($email)` runs these steps and stops at the first answer:
 
-### 🚀 **[Basic Usage & Database Structure →](./email-validation/basic-usage.md)**
-Get started with email validation fundamentals:
-- Overview of validation checks
-- Database schema and structure  
-- Individual email validation
-- Manual status updates
-- Quick examples
+1. **A stored verdict.** If the address already has a row, that verdict is returned without any lookup. The exception is a block from a local check that is older than `MAILTRAP_VALIDATION_CACHE_DURATION` seconds: that one is checked again.
+2. **The format**, with PHP's `FILTER_VALIDATE_EMAIL`.
+3. **A known domain.** If another address on the same domain is already `valid`, the address is stored as `valid` without a DNS lookup.
+4. **The mail server.** The domain must have an MX record (`getmxrr()`), and at least one of those hosts must resolve to an IP address (`gethostbyname()`).
 
-### 📊 **[Bulk Validation →](./email-validation/bulk-validation.md)**
-Efficiently validate multiple email addresses:
-- Bulk validation methods
-- Result structures and status types
-- Performance considerations
-- Common use cases (newsletter, import)
+It does not connect to the mail server and does not know whether the mailbox exists. There is no call to Mailtrap.
 
-### 🎨 **[Laravel Collections →](./email-validation/laravel-collections.md)**
-Advanced filtering and data manipulation:
-- Collection operations and filtering
-- Data transformation techniques
-- Handy one-liners and patterns
-- Real-world filtering examples
+The result is stored and returned:
 
-### 📋 **[API Reference →](./email-validation/api-reference.md)**
-Complete method documentation:
-- All static methods with parameters
-- Return value structures
-- Error handling and exceptions
-- Database schema details
+| Outcome | Return value | Stored verdict | Stored `status_code` |
+| --- | --- | --- | --- |
+| Passed | `null` | `valid`, reason `All checks passed` or `Domain already verified` | `200` |
+| Bad format | `Invalid email format` | `blocked` | `400` |
+| No MX record | `No valid mail server found for domain` | `blocked` | `400` |
+| MX host without IP | `MX record does not resolve to a valid IP address` | `blocked` | `400` |
+| A stored `invalid` or `blocked` verdict | The stored reason | unchanged | unchanged |
 
-### 💡 **[Practical Examples →](./email-validation/examples.md)**
-Real-world implementation examples:
-- Newsletter validation
-- User registration flow
-- Batch import with reporting
-- Email list cleanup
-- API endpoints
-- Scheduled maintenance
+The DNS lookups are synchronous. A slow DNS server slows down the request that calls this method.
 
-### ⚡ **[Best Practices →](./email-validation/best-practices.md)**
-Performance and maintenance guidelines:
-- Performance optimization
-- Error handling strategies
-- Monitoring and maintenance
-- Security considerations
-- Testing approaches
+## Check one address
 
-## Quick Start
-
-### Basic Validation
 ```php
 use Darvis\Mailtrap\Models\EmailValidation;
 
-// Validate a single email (returns null if valid, error message if invalid)
-$errorMessage = EmailValidation::validateEmail('user@example.com');
-$isValid = $errorMessage === null;
+$reason = EmailValidation::validateEmail('user@example.com');
 
-// Bulk validation
-$emails = ['user1@test.com', 'user2@example.com'];
-$result = EmailValidation::bulkValidationStatus($emails);
-
-echo "Valid: " . $result['valid'];
-echo "Invalid: " . $result['invalid'];
+if ($reason === null) {
+    // valid
+} else {
+    // $reason says why not, e.g. "No valid mail server found for domain"
+}
 ```
 
-### Laravel Collections Filtering
+As a rule in a form request (a class that validates a form in Laravel):
+
 ```php
-// Filter invalid emails
-$invalidEmails = collect($result['details'])
-    ->filter(fn($details) => $details['status'] !== 'valid')
-    ->keys()
-    ->toArray();
+<?php
+// app/Http/Requests/SubscribeRequest.php
+
+namespace App\Http\Requests;
+
+use Closure;
+use Darvis\Mailtrap\Models\EmailValidation;
+use Illuminate\Foundation\Http\FormRequest;
+
+class SubscribeRequest extends FormRequest
+{
+    public function rules(): array
+    {
+        return [
+            'email' => [
+                'required',
+                'email',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (EmailValidation::validateEmail((string) $value) !== null) {
+                        $fail('We cannot send mail to this address.');
+                    }
+                },
+            ],
+        ];
+    }
+}
 ```
 
-## Key Features
+The closure stores a verdict for the address. A later send to it reuses that verdict.
 
-- ✅ **Format Validation** - Checks basic email format
-- ✅ **MX Record Verification** - Verifies domain mail servers  
-- ✅ **IP Validation** - Checks if MX records point to valid IPs
-- ✅ **Bulk Processing** - Efficient validation of multiple emails
-- ✅ **Laravel Collections** - Powerful filtering and data manipulation
-- ✅ **Database Caching** - Fast lookups of previously validated emails
-- ✅ **Status Tracking** - Maintains validation history
+## Look up a verdict without checking
 
-## Navigation Guide
+These methods only read the table. They never do a DNS lookup.
 
-| What you want to do | Go to |
-|---------------------|-------|
-| **Get started** | [Basic Usage →](./email-validation/basic-usage.md) |
-| **Validate multiple emails** | [Bulk Validation →](./email-validation/bulk-validation.md) |
-| **Filter and manipulate results** | [Laravel Collections →](./email-validation/laravel-collections.md) |
-| **See real examples** | [Practical Examples →](./email-validation/examples.md) |
-| **Look up a method** | [API Reference →](./email-validation/api-reference.md) |
-| **Optimize performance** | [Best Practices →](./email-validation/best-practices.md) |
+```php
+EmailValidation::isBlocked('user@example.com');      // true when the verdict is "blocked"
+EmailValidation::getBlockReason('user@example.com'); // the reason, or null when not blocked
+EmailValidation::isValid('user@example.com');        // true when this address, or another one on its domain, is "valid"
+```
 
-## Status Types
+`isValid()` looks at the domain too; `isBlocked()` never does. An address without a row is neither valid nor blocked.
 
-- **`valid`** - Email passed all validation checks
-- **`blocked`** - Email is blocked (spam domain, invalid MX, etc.)
-- **`invalid`** - Email has format issues or other problems  
-- **`not_exists`** - Email not found in database (needs validation)
+Addresses are compared as written. Whether `User@Example.com` matches `user@example.com` depends on the collation of your database.
 
-## Getting Help
+## Block, unblock or mark an address
 
-Each chapter includes:
-- 📖 **Detailed explanations** with context
-- 💻 **Code examples** you can copy and use
-- ⚡ **Performance tips** and best practices
-- 🔗 **Cross-references** to related topics
+```php
+EmailValidation::markAsBlocked('complainer@example.com', 'Spam complaint');  // stops every send to this address
+EmailValidation::markAsInvalid('old@example.com', 'Left the company');       // recorded, does not stop a send
+EmailValidation::markAsValid('complainer@example.com');                      // lifts a block
+```
 
-Start with [Basic Usage →](./email-validation/basic-usage.md) if you're new to the EmailValidation model, or jump directly to the chapter that matches your needs using the navigation guide above.
+Each call replaces the row of that address. A block set this way never expires. Which verdict stops a send is explained on [Sending, blocking and mail logs](./sending-and-logging.md#which-verdict-stops-a-send).
+
+## Get the status of a list
+
+`bulkValidationStatus()` reads the verdicts of a list in one query, without lookups:
+
+```php
+use Darvis\Mailtrap\Models\EmailValidation;
+
+$result = EmailValidation::bulkValidationStatus([
+    'first@example.com',
+    'second@example.com',
+    'third@example.com',
+]);
+```
+
+```php
+[
+    'valid' => 1,        // verdict "valid"
+    'invalid' => 1,      // verdict "invalid" or "blocked"
+    'not_exists' => 1,   // no row yet
+    'total' => 3,
+    'details' => [
+        'first@example.com' => [
+            'status' => 'valid',
+            'reason' => 'All checks passed',
+            'last_checked_at' => Illuminate\Support\Carbon,
+        ],
+        'second@example.com' => [
+            'status' => 'blocked',
+            'reason' => 'No valid mail server found for domain',
+            'last_checked_at' => Illuminate\Support\Carbon,
+        ],
+        'third@example.com' => [
+            'status' => 'not_exists',
+            'reason' => 'Email address not found in database',
+            'last_checked_at' => null,
+        ],
+    ],
+]
+```
+
+`not_exists` is not a stored verdict; it only appears in this result.
+
+To also check the addresses that have no row yet, pass `true` as the second argument:
+
+```php
+$result = EmailValidation::bulkValidationWithCheck($emails, true);
+```
+
+This calls `validateEmail()` for each unknown address, one after another, with DNS lookups. For a long list, run it in a queued job. With `false` (the default) it behaves like `bulkValidationStatus()`.
+
+Pick the addresses you can mail from the result with a collection:
+
+```php
+$sendable = collect($result['details'])
+    ->filter(fn (array $details): bool => $details['status'] === EmailValidation::VALID)
+    ->keys()
+    ->all();
+```
+
+## All methods
+
+All methods are static.
+
+- `validateEmail(string $email): ?string`: `null` when valid, otherwise the reason. Stores the verdict.
+- `isBlocked(string $email): bool`: whether the verdict is `blocked`.
+- `getBlockReason(string $email): ?string`: the block reason, or `null`.
+- `isValid(string $email): bool`: whether the address, or another address on its domain, is `valid`.
+- `markAsValid(string $email): self`: stores `valid` with reason `Email validated successfully` and status code `200`.
+- `markAsInvalid(string $email, string $reason, int|string|null $statusCode = null): self`: stores `invalid`.
+- `markAsBlocked(string $email, string $reason, int|string|null $statusCode = null): self`: stores `blocked`.
+- `saveValidation(string $email, string $status, string $reason, int|string|null $statusCode): self`: stores any verdict; the `markAs…` methods call this.
+- `bulkValidationStatus(array $emails): array`: counts and details, see above.
+- `bulkValidationWithCheck(array $emails, bool $validateMissing = false): array`: the same, after validating unknown addresses when asked.
+- `domainOf(string $email): string`: the lowercased domain, or an empty string.
+
+Constants: `EmailValidation::VALID` (`'valid'`), `EmailValidation::INVALID` (`'invalid'`), `EmailValidation::BLOCKED` (`'blocked'`), and `EmailValidation::LOCAL_CHECK_REASONS`, the list of reasons whose blocks expire.
+
+## The email_validations table
+
+| Column | Type | Contents |
+| --- | --- | --- |
+| `id` | big integer | Primary key |
+| `email` | string, nullable | The address |
+| `domain` | string, nullable | The lowercased domain of the address |
+| `status` | enum | `valid`, `invalid` or `blocked` |
+| `reason` | string | Why the address has this verdict |
+| `status_code` | string, nullable | `200` or `400` from a local check, or the response code of a webhook event |
+| `last_checked_at` | timestamp | When the verdict was stored |
+| `created_at`, `updated_at` | timestamp | |
+
+## Next steps
+
+- [Sending, blocking and mail logs](./sending-and-logging.md)
+- [Testing](./testing.md): give addresses a verdict up front so tests run no DNS lookups

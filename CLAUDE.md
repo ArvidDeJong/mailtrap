@@ -53,7 +53,7 @@ On `MessageSending`, for each To, Cc and Bcc recipient:
 - `spam` → `markAsInvalid()` (default 400)
 - `reject` → `markAsInvalid()` (default 450)
 
-The event-to-verdict mapping lives in the `EVENTS` constant of the controller. For every handled event, `apply()` updates the `MailLog` row matching `message_id` **and** recipient (recipients of one mail share the id), or creates a new one (the local `MessageSending` path may not have run, e.g. when Mailtrap is the only source of truth). The endpoint always returns 200 to keep Mailtrap from retrying — failures are swallowed and counted as `skipped`.
+The event-to-verdict mapping lives in the `EVENTS` constant of the controller. For every handled event, `apply()` updates the `MailLog` row matching `message_id` **and** recipient (recipients of one mail share the id), or creates a new one (the local `MessageSending` path may not have run, e.g. when Mailtrap is the only source of truth). Once the payload has an `events` list the endpoint returns 200 to keep Mailtrap from retrying — failures are swallowed and counted as `skipped`. A payload without that list gets 400.
 
 Webhook signature verification runs in [VerifyMailtrapWebhookSignature](src/Http/Middleware/VerifyMailtrapWebhookSignature.php), attached as route middleware in the service provider — not inline in the controller. It checks the HMAC-SHA256 of the **raw** request body against the `Mailtrap-Signature` header and **fails closed**: with `webhook.verify_signature` on and no `webhook.secret`, every call is rejected with 403. Never re-encode the body before hashing; Mailtrap signs the bytes as sent. The route itself is only registered when `webhook.enabled` is true.
 
@@ -85,7 +85,8 @@ Captures `debug_backtrace` to record `source_file` and `source_line` of the call
 
 ## Conventions specific to this package
 
-- `docs/README.md` is only for browsing on GitHub and is excluded from the site. Pages under `docs/email-validation/` also need `parent: "Email validation"`. The site says the package is not an official Mailtrap product; keep it that way and don't use Mailtrap's logo. `tests/DocsSiteTest.php` guards these rules.
+- Every docs page sits directly in `docs/`; there is no `docs/README.md` and no sub section. The index, the README and the FAQ say the package is unofficial (not made or endorsed by Mailtrap); keep it that way and don't use Mailtrap's logo. `tests/DocsSiteTest.php` guards these rules.
+- The inbox default is `ui.middleware = ['web']`, so the page is open to every visitor until the host sets `MAILTRAP_UI_MIDDLEWARE`. The docs, the README and the Boost files say so on purpose; `tests/DocsSiteTest.php` fails when that warning disappears while the default is still `web`. Changing the default is a behaviour change (minor release).
 - `resources/boost/` also holds the `mailtrap-development` skill.
 - Don't change `$casts` into `casts()`; host apps may override it.
 

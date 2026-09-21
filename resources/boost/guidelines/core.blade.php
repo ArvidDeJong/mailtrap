@@ -1,6 +1,6 @@
 ## darvis/mailtrap
 
-This package hooks into every outgoing mail of the application. It validates recipients, logs each send to `mail_logs`, and updates those logs and the address verdicts from signed Mailtrap webhook events.
+This package hooks into every outgoing mail of the application. It is an unofficial package, not made or endorsed by Mailtrap. It validates recipients, logs each send to `mail_logs`, and updates those logs and the address verdicts from signed Mailtrap webhook events.
 
 - Config lives under the key `manta_mailtrap` (file `config/manta_mailtrap.php`), not `mailtrap`.
 - Before sending, To, Cc and Bcc recipients are checked. A recipient whose `EmailValidation` status is `blocked` aborts the whole send with `Symfony\Component\Mailer\Exception\TransportException`, unless `validation.block_invalid` is false. Catch that exception where a failed send must not break the request.
@@ -28,6 +28,7 @@ $log->related; // the Invoice
 
 - Setup and checks: `php artisan mailtrap:install` (interactive setup wizard: migrations, API token, Mailtrap SMTP, webhook, validation, inbox, test mail; flag-driven with `--no-interaction`), `php artisan mailtrap:webhook` (creates the webhook and writes `MAILTRAP_WEBHOOK_SECRET`), `php artisan mailtrap:test you@example.com` (exit code 0 when the mail went out).
 - Mailtrap needs two different tokens. `MAIL_PASSWORD` (with `MAIL_USERNAME=api`) is the **sending domain** token: Sending Domains → Integration. `MAILTRAP_API_TOKEN` is an **account** token with Admin access, used only to create the webhook. Never reuse one for the other. `MAILTRAP_WEBHOOK_SECRET` is the webhook's signing secret, not a token.
+- The inbox page (`/mailtrap`, only with Livewire and Flux) uses the middleware from `MAILTRAP_UI_MIDDLEWARE`. The package default is `web`, which lets every visitor in. Make sure the host sets `web,auth` or stricter, or `MAILTRAP_UI_ENABLED=false`.
 - The webhook `POST /api/webhooks/mailtrap` rejects unsigned calls with 403, and it also does that while no secret is set. After changing `.env`, run `php artisan config:cache` again on servers with a cached config.
 - To react to mail events, listen for `Darvis\Mailtrap\Events\MailBlocked` (before a blocked send is aborted) or `Darvis\Mailtrap\Events\MailtrapEventReceived` (every webhook event, including `unsubscribe`, which the package itself ignores). Don't add a second webhook route for this.
 - Outgoing mail gets an `X-MT-Custom-Variables` header containing `x_message_id`. When you set your own custom variables, add them to that JSON; don't replace the header.

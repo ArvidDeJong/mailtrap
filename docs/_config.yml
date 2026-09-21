@@ -1,5 +1,5 @@
 title: darvis/mailtrap
-description: Mailtrap integration for Laravel. Validates recipients before sending, logs every outgoing mail, processes signed Mailtrap webhook events and ships an inbox UI.
+description: Unofficial Mailtrap integration for Laravel. Checks recipients before sending (format and MX), logs every outgoing mail, processes signed Mailtrap webhook events and adds an inbox page.
 url: https://arviddejong.github.io
 baseurl: /mailtrap
 
@@ -10,11 +10,6 @@ plugins:
   - jekyll-seo-tag
   - jekyll-sitemap
 
-# docs/README.md is the index for browsing on GitHub; the site has its own index.md.
-exclude:
-  - README.md
-  - examples/
-
 # Facts about the package, used by the structured data and llms.txt.
 package:
   name: darvis/mailtrap
@@ -23,7 +18,7 @@ package:
   license_url: https://github.com/ArvidDeJong/mailtrap/blob/main/LICENSE
   requires: PHP 8.2+, Laravel 11, 12 or 13; Livewire ^3.7.4 or ^4.0 and Flux ^2.11 only for the inbox UI
   platforms: [Laravel]
-  keywords: [laravel, mailtrap, email validation, mail log, webhook, bounce handling, livewire]
+  keywords: [laravel, mailtrap, laravel mailtrap, email validation, mx check, mail log, email logging, mailtrap webhook, webhook signature, bounce handling, livewire]
 
 # Developer credit in the footer and the structured data.
 developer:
