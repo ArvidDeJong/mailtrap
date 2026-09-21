@@ -90,7 +90,7 @@ EmailValidation::isValid('user@example.com');        // true when this address, 
 
 `isValid()` looks at the domain too; `isBlocked()` never does. An address without a row is neither valid nor blocked.
 
-Addresses are compared as written. Whether `User@Example.com` matches `user@example.com` depends on the collation of your database.
+Addresses are trimmed and compared in lower case, on every database. `User@Example.com` and `user@example.com` are one address with one row, stored as `user@example.com`. A row that a version before 1.6.0 stored with capitals is still found, and is rewritten in lower case the next time its verdict is saved.
 
 ## Block, unblock or mark an address
 
@@ -142,7 +142,7 @@ $result = EmailValidation::bulkValidationStatus([
 ]
 ```
 
-`not_exists` is not a stored verdict; it only appears in this result.
+`not_exists` is not a stored verdict; it only appears in this result. The keys of `details` are the addresses as you passed them.
 
 To also check the addresses that have no row yet, pass `true` as the second argument:
 
@@ -184,7 +184,7 @@ Constants: `EmailValidation::VALID` (`'valid'`), `EmailValidation::INVALID` (`'i
 | Column | Type | Contents |
 | --- | --- | --- |
 | `id` | big integer | Primary key |
-| `email` | string, nullable | The address |
+| `email` | string, nullable | The address, in lower case |
 | `domain` | string, nullable | The lowercased domain of the address |
 | `status` | enum | `valid`, `invalid` or `blocked` |
 | `reason` | string | Why the address has this verdict |

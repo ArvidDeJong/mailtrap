@@ -117,6 +117,7 @@ it('installs with a webhook in one non-interactive run', function (): void {
     fakeMailtrapApi();
 
     $this->artisan('mailtrap:install', ['--webhook' => true, '--skip-migrations' => true, '--no-interaction' => true])
+        ->expectsOutputToContain("Gate::define('viewMailtrap'")
         ->assertSuccessful();
 
     expect(envContents())->toContain("MAILTRAP_WEBHOOK_ENABLED=true\nMAILTRAP_WEBHOOK_SECRET=".NEW_SECRET);

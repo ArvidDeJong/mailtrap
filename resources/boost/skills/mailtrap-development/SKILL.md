@@ -12,9 +12,11 @@ Use this skill when code sends mail in an application that has `darvis/mailtrap`
 ## How a send is processed
 
 1. On `MessageSending`, every To, Cc and Bcc address runs through `EmailValidation::validateEmail()`: a format check, then the MX record and whether it resolves to an IP. The DNS lookups are skipped when another address on the domain is already valid. Set `validation.enabled` to false to skip validation altogether.
-2. A `blocked` address aborts the send: a `MailLog` row with status `550` is written and a `TransportException` is thrown.
+2. All recipients are checked before any row is written. A `blocked` address aborts the send: every recipient of that mail gets a `MailLog` row with status `550` (the others with `Not sent: … is blocked` as error), and a `TransportException` is thrown.
 3. Otherwise one `MailLog` row per recipient is created with `status_code = null`. Every row of the mail shares the `X-Message-ID` header.
 4. On `MessageSent` those rows become `200`. Mailtrap webhook events later update the row for that recipient. The row is found through the `x_message_id` custom variable (the `X-MT-Custom-Variables` header), otherwise through Mailtrap's `message_id`.
+
+A failure to write the log is reported to the exception handler and never stops the mail. Addresses are trimmed and compared in lower case in `email_validations` and in `MailLog::toRecipient()`.
 
 ## Tagging mail with a model
 
@@ -67,6 +69,10 @@ Event::listen(function (MailBlocked $event): void {
 ```
 
 `MailtrapEventReceived` also fires for `unsubscribe`, `soft bounce` and `suspension`, which the package does not act on. A listener that throws does not break the webhook batch.
+
+## Inbox access
+
+The inbox route ends with `Darvis\Mailtrap\Http\Middleware\AuthorizeInbox`, which aborts with 403 unless `Gate::allows('viewMailtrap')`. The package default allows the `local` environment only; a gate of the host application replaces it. The component repeats the check in `boot()`, `render()` and every action. In a host test that opens the inbox, define the gate first: `Gate::define('viewMailtrap', fn ($user = null) => true);`.
 
 ## Testing
 

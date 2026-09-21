@@ -191,14 +191,30 @@ test('the site, the README and the FAQ say the package is unofficial', function 
         ->toContain('not an official Mailtrap product');
 });
 
-test('the docs say who can open the inbox with the default middleware', function () {
-    // The default is "web" without a login check. As long as that is so, the docs must say it.
-    $config = require dirname(__DIR__).'/config/manta_mailtrap.php';
+test('the docs tell a site owner how to open the inbox with the viewMailtrap gate', function () {
+    // Without this snippet an upgraded site answers 403 and the owner has nowhere to look.
+    $snippet = "Gate::define('viewMailtrap', fn (?User \$user) => \$user?->is_admin === true);";
 
-    expect($config['ui']['middleware'])->toBe(['web']);
+    $files = [
+        docsSitePath('inbox.md'),
+        docsSitePath('installation.md'),
+        docsSitePath('troubleshooting.md'),
+        docsSitePath('_data/faq.yml'),
+        dirname(__DIR__).'/README.md',
+        dirname(__DIR__).'/CHANGELOG.md',
+        dirname(__DIR__).'/resources/boost/guidelines/core.blade.php',
+    ];
 
-    foreach ([docsSitePath('inbox.md'), docsSitePath('installation.md'), dirname(__DIR__).'/README.md'] as $file) {
-        expect(str_contains((string) file_get_contents($file), 'MAILTRAP_UI_MIDDLEWARE=web,auth'))->toBeTrue(basename($file));
+    foreach ($files as $file) {
+        expect(str_contains((string) file_get_contents($file), $snippet))->toBeTrue(basename($file));
+    }
+
+    // The old warning described an inbox that was open by default; it must not come back.
+    foreach ([docsSitePath('index.md'), docsSitePath('inbox.md'), dirname(__DIR__).'/README.md'] as $file) {
+        expect((string) file_get_contents($file))
+            ->toContain('viewMailtrap')
+            ->toContain('403')
+            ->not->toMatch('/every visitor can open|open to every visitor/i');
     }
 });
 

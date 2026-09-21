@@ -38,11 +38,15 @@ Two service providers, layered:
 On `MessageSending`, for each To, Cc and Bcc recipient:
 
 1. Run `EmailValidation::validateEmail()` (skipped when `validation.enabled` is false). It returns a cached verdict when there is one that has not gone stale. Otherwise it checks the format, then skips DNS if another address on the domain is already valid, and otherwise checks for an MX record that resolves to an IP.
-2. If `EmailValidation::getBlockReason()` returns a reason, log a 550 entry via `MailLog::createWithSource()` and throw `Symfony\Component\Mailer\Exception\TransportException`. That aborts the send.
+2. All recipients are decided on before a row is written. If `EmailValidation::getBlockReason()` returns a reason for one of them, every recipient gets a `MailLog::STATUS_BLOCKED` (550) row via `MailLog::createWithSource()` (nothing was sent to anyone, so none may stay pending), `MailBlocked` fires for the first blocked address and a `Symfony\Component\Mailer\Exception\TransportException` aborts the send.
 3. Otherwise reuse or create the `X-Message-ID` header (one id shared by all recipients) and create a `MailLog` row with `status_code = null`. On `MessageSent`, the rows for that id are updated to `200`.
 4. Optional headers `X-Mail-Type`, `X-Mail-Model`, `X-Mail-Model-ID` are copied into the log; `MailLog::related()` resolves them as a morph relation.
 
 **Blocking is per address, never per domain.** Before 1.2.0 `isBlocked` also matched the domain, so one typo or manual block stopped mail to a whole provider. Only `isValid` looks at the domain, and only as a shortcut to skip DNS lookups.
+
+Every write to `mail_logs` in the listeners goes through `MailServiceProvider::writeLog()`, which reports a failure and carries on. Never let the log decide whether a mail goes out: a missing table or a rejected value must not cost the host a password reset mail. Laravel has no event for a failed transport (only `MessageSending` and `MessageSent`, in 11, 12 and 13), so a row whose transport threw stays pending; that is documented, not fixable from here.
+
+Addresses go through [EmailAddress::normalise()](src/Support/EmailAddress.php) (trim, lower case) wherever `email_validations` is written or read, and `MailLog::toRecipient()` compares `lower(recipient)`. Lookups use `whereRaw('lower(email) = ?')` so rows stored with capitals before 1.6.0 are still found; `saveValidation()` folds such duplicates into one row. Never compare an address with a plain `where('email', …)`: SQLite and PostgreSQL compare as written, so a block would not stop another spelling.
 
 ### Webhook flow
 
@@ -77,7 +81,7 @@ Use the constants (`EmailValidation::VALID/INVALID/BLOCKED`, `MailLog::STATUS_SE
 
 ### `MailLog::createWithSource()`
 
-Captures `debug_backtrace` to record `source_file` and `source_line` of the caller (relative to `base_path()`). Auto-generates `message_id` with a prefix based on `status_code` (`BLOCKED_`, `VALIDATION_ERROR_`, `TRANSPORT_ERROR_`, `ERROR_`) when none is provided — used for logging mails that were stopped before a real Message-ID existed. Plain `MailLog::create()` does not do any of this.
+Walks `debug_backtrace` and records the first frame outside `vendor/`, outside this package's `src/` and not the entry script as `source_file` and `source_line` (relative to `base_path()`), or nulls when there is none. Never go back to a fixed depth: the method is called from an event listener, so a fixed depth always lands in `Illuminate/Events/Dispatcher.php`. Auto-generates `message_id` with a prefix based on `status_code` (`BLOCKED_`, `VALIDATION_ERROR_`, `TRANSPORT_ERROR_`, `ERROR_`) when none is provided — used for logging mails that were stopped before a real Message-ID existed. Plain `MailLog::create()` does not do any of this.
 
 ### Migrations
 
@@ -86,7 +90,7 @@ Captures `debug_backtrace` to record `source_file` and `source_line` of the call
 ## Conventions specific to this package
 
 - Every docs page sits directly in `docs/`; there is no `docs/README.md` and no sub section. The index, the README and the FAQ say the package is unofficial (not made or endorsed by Mailtrap); keep it that way and don't use Mailtrap's logo. `tests/DocsSiteTest.php` guards these rules.
-- The inbox default is `ui.middleware = ['web']`, so the page is open to every visitor until the host sets `MAILTRAP_UI_MIDDLEWARE`. The docs, the README and the Boost files say so on purpose; `tests/DocsSiteTest.php` fails when that warning disappears while the default is still `web`. Changing the default is a behaviour change (minor release).
+- The inbox is guarded by the `viewMailtrap` gate (Horizon pattern). [AuthorizeInbox](src/Http/Middleware/AuthorizeInbox.php) is appended to the route after `ui.middleware` and registered as Livewire persistent middleware, because Livewire update requests do not run route middleware. The provider defines the gate in a `booted()` callback and only when `Gate::has()` is false, so a host gate always wins; the default allows `local` only. Never make the default more permissive and never rely on `auth` alone: on a site with public registration every customer has a login, and the page shows recipients, deletes logs and sends mail. Never remove the `AuthorizeInbox::authorize()` calls from `boot()`, `render()` and the actions of [MailtrapInbox](src/Livewire/MailtrapInbox.php): every public Livewire method is callable by whoever holds a component snapshot, and an embedded component never passes the route middleware. A new public action gets the same first line. The gate closure takes a nullable user, otherwise Laravel never calls it for a guest. Don't change the `ui.middleware` default to `web,auth`: a host without a `login` route would get an error page instead of a 403.
 - `resources/boost/` also holds the `mailtrap-development` skill.
 - Don't change `$casts` into `casts()`; host apps may override it.
 

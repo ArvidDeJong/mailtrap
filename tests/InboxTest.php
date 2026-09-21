@@ -3,9 +3,13 @@
 use Darvis\Mailtrap\Livewire\MailtrapInbox;
 use Darvis\Mailtrap\Models\EmailValidation;
 use Darvis\Mailtrap\Models\MailLog;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
+    // These tests are about what the inbox does; InboxAuthorizationTest covers who may open it.
+    Gate::define('viewMailtrap', fn ($user = null): bool => true);
+
     config()->set('mail.default', 'array');
     config()->set('mail.mailers.array', ['transport' => 'array']);
     config()->set('mail.from', ['address' => 'sender@example.org', 'name' => 'Sender']);

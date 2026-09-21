@@ -2,7 +2,9 @@
 
 namespace Darvis\Mailtrap\Models;
 
+use Darvis\Mailtrap\Support\EmailAddress;
 use Darvis\Mailtrap\Support\MailtrapConfig;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -70,7 +72,8 @@ class EmailValidation extends Model
      */
     public static function validateEmail(string $email): ?string
     {
-        $existing = static::where('email', $email)->first();
+        $email = EmailAddress::normalise($email);
+        $existing = static::forAddress($email)->first();
 
         if ($existing && ! static::isStale($existing)) {
             return $existing->status === self::VALID ? null : $existing->reason;
@@ -116,18 +119,29 @@ class EmailValidation extends Model
     {
         $at = strrpos($email, '@');
 
-        return $at === false ? '' : strtolower(substr($email, $at + 1));
+        return $at === false ? '' : strtolower(trim(substr($email, $at + 1)));
     }
 
     public static function saveValidation(string $email, string $status, string $reason, int|string|null $statusCode): self
     {
-        return static::updateOrCreate(['email' => $email], [
+        $email = EmailAddress::normalise($email);
+
+        // Rows from before 1.6.0 may hold the same address in several spellings.
+        // Keep one, so lifting a block cannot leave a second row that still blocks.
+        $rows = static::forAddress($email)->orderBy('id')->get();
+        $validation = $rows->shift() ?? static::query()->newModelInstance();
+        $rows->each->delete();
+
+        $validation->fill([
+            'email' => $email,
             'domain' => static::domainOf($email),
             'status' => $status,
             'reason' => $reason,
             'status_code' => $statusCode === null ? null : (string) $statusCode,
             'last_checked_at' => now(),
-        ]);
+        ])->save();
+
+        return $validation;
     }
 
     /**
@@ -147,7 +161,7 @@ class EmailValidation extends Model
      */
     public static function getBlockReason(string $email): ?string
     {
-        return static::where('email', $email)
+        return static::forAddress($email)
             ->where('status', self::BLOCKED)
             ->value('reason');
     }
@@ -159,7 +173,7 @@ class EmailValidation extends Model
     {
         return static::where('status', self::VALID)
             ->where(fn ($query) => $query
-                ->where('email', $email)
+                ->whereRaw('lower(email) = ?', [EmailAddress::normalise($email)])
                 ->orWhere('domain', static::domainOf($email)))
             ->exists();
     }
@@ -187,12 +201,20 @@ class EmailValidation extends Model
      */
     public static function bulkValidationStatus(array $emails): array
     {
-        $validations = static::whereIn('email', $emails)->get()->keyBy('email');
+        $normalised = array_map(fn (string $email): string => EmailAddress::normalise($email), $emails);
+
+        // lower() on the column also finds rows that an older version stored with capitals.
+        $validations = $normalised === []
+            ? collect()
+            : static::whereIn(static::query()->raw('lower(email)'), array_values(array_unique($normalised)))
+                ->orderByDesc('id')
+                ->get()
+                ->keyBy(fn (self $validation): string => EmailAddress::normalise((string) $validation->email));
 
         $result = ['valid' => 0, 'invalid' => 0, 'not_exists' => 0, 'total' => count($emails), 'details' => []];
 
         foreach ($emails as $email) {
-            $validation = $validations->get($email);
+            $validation = $validations->get(EmailAddress::normalise($email));
 
             // "invalid" counts both invalid and blocked addresses.
             $bucket = match ($validation?->status) {
@@ -234,6 +256,19 @@ class EmailValidation extends Model
 
         // validateEmail() stores every verdict, so a second lookup is complete.
         return static::bulkValidationStatus($emails);
+    }
+
+    /**
+     * The rows of one address, whatever its spelling.
+     *
+     * lower() on the column is standard SQL and also matches rows that a version
+     * before 1.6.0 stored with capitals.
+     *
+     * @return Builder<static>
+     */
+    protected static function forAddress(string $email): Builder
+    {
+        return static::query()->whereRaw('lower(email) = ?', [EmailAddress::normalise($email)]);
     }
 
     /**

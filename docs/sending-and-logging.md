@@ -10,11 +10,13 @@ The package listens to Laravel's `MessageSending` and `MessageSent` events. Ever
 
 ## What happens when a mail is sent
 
-Before the mail goes out (`MessageSending`), for every To, Cc and Bcc address:
+Before the mail goes out (`MessageSending`), the package first decides on every To, Cc and Bcc address, and only then writes rows:
 
-1. The address is validated with `EmailValidation::validateEmail()`: the format, then a DNS lookup for a mail server (MX record) that resolves to an IP address. A verdict that is already in the database is reused. The lookups run synchronously during the send. Set `MAILTRAP_VALIDATION_ENABLED=false` to skip this step.
-2. If the address has the verdict `blocked`, the whole send is aborted. A log row with status `550` is written, the `MailBlocked` event is dispatched, and a `Symfony\Component\Mailer\Exception\TransportException` is thrown with the message `Email address {email} is blocked: {reason}`. Set `MAILTRAP_BLOCK_INVALID_EMAILS=false` to send anyway; the reason is then kept in `error_message` of a normal log row.
-3. Otherwise one `mail_logs` row is created for that recipient, with `status_code` `null` (pending).
+1. Each address is validated with `EmailValidation::validateEmail()`: the format, then a DNS lookup for a mail server (MX record) that resolves to an IP address. A verdict that is already in the database is reused. The lookups run synchronously during the send. Set `MAILTRAP_VALIDATION_ENABLED=false` to skip this step.
+2. If one of the addresses has the verdict `blocked`, the whole send is aborted. Every recipient of the mail gets a log row with status `550`, because nothing was sent to anyone. The blocked address carries its reason in `error_message`; the others carry `Not sent: {email} is blocked ({reason})`. Then the `MailBlocked` event is dispatched for the first blocked address, and a `Symfony\Component\Mailer\Exception\TransportException` is thrown with the message `Email address {email} is blocked: {reason}`. Set `MAILTRAP_BLOCK_INVALID_EMAILS=false` to send anyway; the reason is then kept in `error_message` of a normal log row.
+3. Otherwise one `mail_logs` row is created per recipient, with `status_code` `null` (pending).
+
+Writing the log never stops a mail. If a row cannot be written, the exception goes to Laravel's exception handler and the send carries on.
 
 After the mailer accepted the mail (`MessageSent`), every pending row of that message gets status `200`.
 
@@ -54,11 +56,11 @@ All methods are on [Email validation](./email-validation.md).
 | --- | --- |
 | `message_id` | The id shared by all recipients of one mail |
 | `sender` | The From address |
-| `recipient` | One To, Cc or Bcc address |
-| `subject` | The subject. The column is required: a mail without a subject fails, see [troubleshooting](./troubleshooting.md#a-mail-without-a-subject-fails). |
+| `recipient` | One To, Cc or Bcc address, as the mail spelled it |
+| `subject` | The subject, or an empty string for a mail without one |
 | `status_code` | `null` pending, `"200"` sent (`MailLog::STATUS_SENT`), `"550"` blocked (`MailLog::STATUS_BLOCKED`), or the response code of a webhook event |
 | `error_message` | The block reason, or the response text of a bounce, spam or reject event |
-| `source_file`, `source_line` | Filled only for a blocked send. In the current version they point at Laravel's event dispatcher, not at the code that sent the mail. |
+| `source_file`, `source_line` | Only for a blocked send: the first file outside `vendor/` that was involved in sending the mail, relative to the project root, and its line. `null` when there is none, for example for a queued mail. |
 | `type` | The `X-Mail-Type` header, or `webhook` for a row created by a webhook event |
 | `model`, `model_id` | The `X-Mail-Model` and `X-Mail-Model-ID` headers |
 
@@ -111,7 +113,7 @@ MailLog::pending()->count();
 $log->related; // the Invoice, through the model and model_id columns
 ```
 
-A bounce that Mailtrap reports with response code 550 gets the same status as a blocked send, so `blocked()` returns both. Read `error_message` to tell them apart.
+A bounce that Mailtrap reports with response code 550 gets the same status as a blocked send, so `blocked()` returns both. Read `error_message` to tell them apart. `toRecipient()` ignores capitals.
 
 ## Remove old logs
 

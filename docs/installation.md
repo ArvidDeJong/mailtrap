@@ -41,24 +41,38 @@ The wizard explains each step before it asks anything, and writes every answer t
 4. **Sending mail**: keep your current mailer, or send through Mailtrap. For Mailtrap the wizard writes `MAIL_MAILER=smtp`, `MAIL_HOST=live.smtp.mailtrap.io`, `MAIL_PORT=587`, `MAIL_USERNAME=api`, `MAIL_PASSWORD` and `MAIL_FROM_ADDRESS`.
 5. **Webhook for delivery events**: creates the webhook and stores its signing secret. When the site does not send through Mailtrap, the wizard switches the endpoint off. On a local site it tells you to run the wizard on the live server.
 6. **Address validation**: check and block (default), check and only log, or off
-7. **Inbox page**: who may open it, which Blade layout it uses, and the Tailwind `@source` line. Skipped when Livewire is not loaded.
+7. **Inbox page**: the middleware that runs before the gate, which Blade layout the page uses, and the Tailwind `@source` line. Skipped when Livewire is not loaded. The summary prints the gate from step 3.
 8. **Test mail**: sends one through `mailtrap:test`
 
 A summary at the end lists what is still left to do. `.env` is not in git, so run the wizard on every server.
 
-Do you prefer to do it by hand? Run `php artisan migrate`, then set the variables from [Every setting](#every-setting) yourself. Set `MAILTRAP_UI_MIDDLEWARE` first: see step 3.
+Do you prefer to do it by hand? Run `php artisan migrate`, then set the variables from [Every setting](#every-setting) yourself.
 
-### 3. Close the inbox page
+### 3. Say who may open the inbox page
 
-With the package defaults, and Livewire loaded, the inbox at `/mailtrap` runs through the `web` middleware only. **Every visitor can open it without logging in**, read recipients and subjects, delete logs and send a test mail.
+Skip this step when Livewire is not installed or you set `MAILTRAP_UI_ENABLED=false`.
 
-The wizard fixes this in step 7 by writing `MAILTRAP_UI_MIDDLEWARE=web,auth`. If you did not run the wizard, or ran it with `--no-interaction` (which skips that step), set it yourself:
+The inbox at `/mailtrap` shows recipients and subjects, so it is closed by default. It works in the `local` environment. Everywhere else it answers `403` until your application defines the `viewMailtrap` gate, the same way Laravel Horizon does it. No `.env` setting replaces this step.
+
+```php
+// app/Providers/AppServiceProvider.php
+
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+
+public function boot(): void
+{
+    Gate::define('viewMailtrap', fn (?User $user) => $user?->is_admin === true);
+}
+```
+
+`is_admin` is an example; use whatever marks staff in your app. Also let the login run first, so a guest is sent to your login page. The wizard writes this for you in step 7:
 
 ```env
 MAILTRAP_UI_MIDDLEWARE=web,auth
 ```
 
-Or switch the page off with `MAILTRAP_UI_ENABLED=false`. Details on the [inbox page](./inbox.md#who-can-open-the-inbox).
+Details on the [inbox page](./inbox.md#who-can-open-the-inbox).
 
 ## The two Mailtrap tokens and the webhook secret
 
@@ -130,7 +144,7 @@ php artisan mailtrap:install --without-webhook --no-interaction  # not sending t
 | `--config` | Publish `config/manta_mailtrap.php` when it does not exist yet |
 | `--skip-migrations` | Do not run the migrations |
 
-With neither `--webhook` nor `--without-webhook` the command prints `Webhook left unchanged. Pass --webhook or --without-webhook.` This mode does not touch the mailer, the validation or the inbox settings.
+With neither `--webhook` nor `--without-webhook` the command prints `Webhook left unchanged. Pass --webhook or --without-webhook.` This mode does not touch the mailer, the validation or the inbox settings. It prints the `viewMailtrap` gate from step 3 as a reminder.
 
 ## Run the wizard again
 
@@ -184,7 +198,7 @@ All settings are environment variables. The config path is the key inside `confi
 | --- | --- | --- | --- |
 | `MAILTRAP_UI_ENABLED` | `true` | `ui.enabled` | Register the inbox page. |
 | `MAILTRAP_UI_ROUTE` | `mailtrap` | `ui.route` | Path of the page. |
-| `MAILTRAP_UI_MIDDLEWARE` | `web` | `ui.middleware` | Comma separated middleware. The default has no login check; use `web,auth` or stricter. |
+| `MAILTRAP_UI_MIDDLEWARE` | `web` | `ui.middleware` | Comma separated middleware that runs before the `viewMailtrap` gate. Use `web,auth` so a guest is sent to the login page. |
 | `MAILTRAP_UI_LAYOUT` | `components.layouts.app` | `ui.layout` | Blade layout the page is rendered in. |
 | `MAILTRAP_UI_PER_PAGE` | `25` | `ui.per_page` | Rows per page. |
 

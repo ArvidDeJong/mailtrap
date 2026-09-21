@@ -16,7 +16,7 @@ A Laravel package that checks every recipient before a mail goes out, logs every
 - **Mail log**: one `mail_logs` row per recipient, optionally linked to a model through `X-Mail-*` headers, with query scopes and pruning
 - **Signed webhook**: `POST /api/webhooks/mailtrap` checks the `Mailtrap-Signature` header (HMAC-SHA256) and updates logs and address verdicts
 - **Events**: `MailBlocked` and `MailtrapEventReceived` for your own listeners
-- **Inbox page**: a Livewire/Flux page to search, inspect and clean up the mail log
+- **Inbox page**: a Livewire/Flux page to search, inspect and clean up the mail log, closed by a `viewMailtrap` gate
 - **Commands**: `mailtrap:install` (setup wizard), `mailtrap:webhook` (creates the webhook and stores its secret), `mailtrap:test` (health check with exit code)
 
 ## Requirements
@@ -36,7 +36,16 @@ The wizard runs the migrations and walks you through the Mailtrap tokens, the ma
 
 ### Who can open the inbox page
 
-With the package defaults, and Livewire installed, the inbox at `/mailtrap` only runs through the `web` middleware: **every visitor can open it**, read recipients and subjects, delete logs and send a test mail. The interactive wizard writes `MAILTRAP_UI_MIDDLEWARE=web,auth`. If you install without the wizard, or with `--no-interaction`, set that variable yourself, or set `MAILTRAP_UI_ENABLED=false`.
+Outside the `local` environment the inbox at `/mailtrap` answers `403` until your application defines the `viewMailtrap` gate, the way Laravel Horizon does it. Add this to `AppServiceProvider::boot()` and adapt the condition to your users:
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+
+Gate::define('viewMailtrap', fn (?User $user) => $user?->is_admin === true);
+```
+
+Set `MAILTRAP_UI_MIDDLEWARE=web,auth` as well, so a guest is sent to your login page; the wizard writes that for you. `MAILTRAP_UI_ENABLED=false` switches the page off.
 
 ## Quick start
 

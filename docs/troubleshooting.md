@@ -1,6 +1,6 @@
 ---
 title: "Troubleshooting"
-description: "Fix problems with darvis/mailtrap: a blocked address, a webhook that answers 403, missing tables, an open or unstyled inbox, pending logs, cached config."
+description: "Fix problems with darvis/mailtrap: a blocked address, a webhook or inbox that answers 403, missing tables, an unstyled inbox, pending logs, cached config."
 nav_order: 9
 ---
 
@@ -42,13 +42,13 @@ Use a real address of your own for `mailtrap:test`. An address on a made-up doma
 
 The check runs where the mail is really sent. For a queued mailable that is the queue worker, so the `TransportException` fails the job instead of reaching your controller. Check the address before you queue the mail with `EmailValidation::isBlocked($email)`, or listen for the `MailBlocked` event.
 
-### A mail without a subject fails
+### The mail went out but the log is missing
 
-The error is `NOT NULL constraint failed: mail_logs.subject` on SQLite and `Column 'subject' cannot be null` on MySQL. The mail has no subject, and the `subject` column of `mail_logs` is required. The send is aborted by this database error. Give every mail a subject.
+Writing the log never stops a mail. When a row cannot be written (a missing `mail_logs` table, a database error), the package reports the exception to Laravel's exception handler, so it is in `storage/logs/laravel.log` or your error tracker, and the mail is sent anyway. Look there for the cause. A mail without a subject is logged with an empty subject.
 
 ### no such table: mail_logs or email_validations
 
-Also: `Base table or view not found`. The package is installed but its migrations did not run. Every send now fails, because every recipient is looked up in `email_validations`. Run:
+Also: `Base table or view not found`. The package is installed but its migrations did not run. A missing `email_validations` table makes every send fail, because every recipient is looked up there before the mail goes out. A missing `mail_logs` table only costs you the log. Run:
 
 ```bash
 php artisan migrate
@@ -78,10 +78,9 @@ The DNS lookups run during the send, once per address without a verdict. Queue y
 
 ### A log stays Pending
 
-A row is pending (`status_code` `null`) from the moment the mail is handed to the mailer until Laravel fires `MessageSent`. It stays pending when:
+A row is pending (`status_code` `null`) from the moment the mail is handed to the mailer until Laravel fires `MessageSent`. It stays pending when the mailer threw an error after the row was written, for example an SMTP failure. Laravel has no event for a failed send, so the package cannot mark that row as failed. The exception of that send tells you why.
 
-- The mailer threw an error after the row was written. The exception of that send tells you why.
-- The mail had several recipients and a later one was blocked. The rows of the recipients before it were already written and stay pending, although nothing was sent.
+A blocked recipient does not leave pending rows: every recipient of that mail gets status `550`.
 
 ### Mail sent, but no log found (is logging disabled?)
 
@@ -135,9 +134,25 @@ The URL is local: `localhost`, `127.0.0.1` or a host ending in `.test`, `.local`
 
 ## Inbox page
 
-### Everyone can open /mailtrap
+### /mailtrap gives 403
 
-That is the package default: the middleware list is `web`. Set `MAILTRAP_UI_MIDDLEWARE=web,auth` or stricter, then `php artisan config:cache` and `php artisan route:cache` if you use those caches. See [who can open the inbox](./inbox.md#who-can-open-the-inbox).
+The `viewMailtrap` gate refused the visitor. Without a gate of your own, the inbox only opens in the `local` environment. Define the gate in `AppServiceProvider::boot()`:
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+
+Gate::define('viewMailtrap', fn (?User $user) => $user?->is_admin === true);
+```
+
+If you have a gate and still get `403`:
+
+- You are not logged in as a user the gate allows.
+- The gate's parameter is not nullable (`User $user`). Laravel then refuses a guest without calling your gate. Write `?User $user`.
+- `MAILTRAP_UI_MIDDLEWARE` has no `auth`, so nobody is sent to the login page and the gate sees a guest.
+- A button in the inbox answers `403` after a while: your session ended. Log in again.
+
+See [who can open the inbox](./inbox.md#who-can-open-the-inbox).
 
 ### /mailtrap gives 404
 

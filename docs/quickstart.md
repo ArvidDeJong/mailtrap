@@ -116,7 +116,7 @@ $log->related;        // the User model
 
 ## 4. Look at it in the browser
 
-If Livewire and Flux are installed, open `/mailtrap` to see the same log in the [inbox page](./inbox.md). Make sure that page is [closed to visitors](./inbox.md#who-can-open-the-inbox) first.
+If Livewire and Flux are installed, open `/mailtrap` to see the same log in the [inbox page](./inbox.md). It opens in the `local` environment; on a live site you first define [the `viewMailtrap` gate](./inbox.md#who-can-open-the-inbox).
 
 ## Next steps
 
