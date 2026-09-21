@@ -156,7 +156,7 @@ class MailtrapWebhookController extends Controller
 
         // Recipients of one message share its id, so match the recipient as well.
         $mailLog = MailLog::where('message_id', $messageId)
-            ->whereRaw('lower(recipient) = ?', [strtolower($email)])
+            ->toRecipient($email)
             ->first();
 
         if ($mailLog !== null) {

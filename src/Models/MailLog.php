@@ -2,6 +2,7 @@
 
 namespace Darvis\Mailtrap\Models;
 
+use Darvis\Mailtrap\Support\EmailAddress;
 use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
@@ -81,20 +82,9 @@ class MailLog extends Model
      */
     public static function createWithSource(array $data): static
     {
-        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-        $caller = $backtrace[1] ?? $backtrace[0];
-
-        $sourceFile = $caller['file'] ?? null;
-        if ($sourceFile) {
-            // Store relative path from base_path
-            $basePath = base_path().DIRECTORY_SEPARATOR;
-            if (str_starts_with($sourceFile, $basePath)) {
-                $sourceFile = substr($sourceFile, strlen($basePath));
-            }
-        }
-
-        $data['source_file'] = $sourceFile;
-        $data['source_line'] = $caller['line'] ?? null;
+        [$data['source_file'], $data['source_line']] = static::callerOutsidePackage(
+            debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)
+        );
 
         // Generate unique message_id if not provided
         if (empty($data['message_id'])) {
@@ -108,6 +98,40 @@ class MailLog extends Model
         }
 
         return static::query()->create($data);
+    }
+
+    /**
+     * The first frame that belongs to the application: not in vendor/, not in this
+     * package, and not the entry script. The package is called from an event
+     * listener, so a fixed depth only ever finds Laravel's event dispatcher.
+     *
+     * @param  array<int, array<string, mixed>>  $backtrace
+     * @return array{0: string|null, 1: int|null} File relative to base_path() and line, or nulls when there is no such frame (a queued mail, for example).
+     */
+    protected static function callerOutsidePackage(array $backtrace): array
+    {
+        $separator = DIRECTORY_SEPARATOR;
+        $package = dirname(__DIR__).$separator;
+        $basePath = base_path().$separator;
+        $entryScripts = [base_path('artisan'), public_path('index.php')];
+
+        foreach ($backtrace as $frame) {
+            $file = $frame['file'] ?? null;
+
+            if (! is_string($file)
+                || str_contains($file, $separator.'vendor'.$separator)
+                || str_starts_with($file, $package)
+                || in_array($file, $entryScripts, true)) {
+                continue;
+            }
+
+            return [
+                str_starts_with($file, $basePath) ? substr($file, strlen($basePath)) : $file,
+                isset($frame['line']) ? (int) $frame['line'] : null,
+            ];
+        }
+
+        return [null, null];
     }
 
     /**
@@ -191,7 +215,8 @@ class MailLog extends Model
      */
     public function scopeToRecipient(Builder $query, string $email)
     {
-        return $query->where('recipient', $email);
+        // Case-insensitive on every driver; rows keep the spelling the mail was sent with.
+        return $query->whereRaw('lower(recipient) = ?', [EmailAddress::normalise($email)]);
     }
 
     /**
