@@ -28,4 +28,4 @@
   a: The endpoint `POST /api/webhooks/mailtrap` compares an HMAC-SHA256 of the raw request body, keyed with `MAILTRAP_WEBHOOK_SECRET`, to the `Mailtrap-Signature` header. A call without a valid signature gets 403, and so does every call while no secret is configured.
 
 - q: Who can open the darvis/mailtrap inbox page?
-  a: With the package defaults everyone, because the default middleware is `web` without a login check. Set `MAILTRAP_UI_MIDDLEWARE=web,auth` or stricter, or `MAILTRAP_UI_ENABLED=false`. The interactive `mailtrap:install` wizard writes `web,auth` for you.
+  a: Outside the `local` environment nobody, until the application defines the `viewMailtrap` gate, the way Laravel Horizon does it. For example `Gate::define('viewMailtrap', fn (?User $user) => $user?->is_admin === true);` in `AppServiceProvider::boot()`. The middleware from `MAILTRAP_UI_MIDDLEWARE` runs before the gate, and `MAILTRAP_UI_ENABLED=false` removes the page.

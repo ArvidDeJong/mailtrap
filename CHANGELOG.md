@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **The inbox page was open to every visitor.** With Livewire installed and the default
+  settings, anyone who opened `/mailtrap` could read recipients, subjects and errors, delete
+  logs and send a test mail from your server. The page is now guarded by a `viewMailtrap`
+  gate, the way Laravel Horizon, Telescope and Pulse do it. Without a gate of your own the
+  inbox only opens in the `local` environment and **answers 403 everywhere else**, logged in
+  or not. The check also runs on every Livewire update request and at the start of every
+  action of the component, so an inbox embedded in your own page is covered too.
+
+  **What you have to do after upgrading:** to keep the inbox reachable on a staging or
+  production site, add this to `AppServiceProvider::boot()` and adapt the condition to your
+  users. Without it the page answers 403 outside `local`.
+
+  ```php
+  use App\Models\User;
+  use Illuminate\Support\Facades\Gate;
+
+  Gate::define('viewMailtrap', fn (?User $user) => $user?->is_admin === true);
+  ```
+
+  Keep the user nullable (`?User`): Laravel refuses a guest without calling a gate whose
+  parameter is not nullable. `MAILTRAP_UI_MIDDLEWARE` (for example `web,auth`) still runs
+  first and sends guests to your login page; `MAILTRAP_UI_ENABLED=false` still removes the
+  page. A login alone is not enough on a site with public registration, which is why the
+  gate exists. `mailtrap:install` now prints this snippet.
+- **A block did not stop another spelling of the same address.** On SQLite and PostgreSQL a
+  block on `dead@example.com` let mail to `Dead@Example.com` through. Addresses are now
+  trimmed and compared in lower case wherever the package stores or looks up a verdict, and
+  `MailLog::toRecipient()` ignores capitals. Rows stored with capitals by an older version
+  are still found and are folded into one lower case row the next time the verdict is saved.
+  Nothing to do after upgrading.
+
+### Fixed
+
+- **A mail without a subject was not sent.** The log insert failed on the required `subject`
+  column and that error aborted the send. The subject is now stored as an empty string, and
+  no failure to write the mail log can stop a mail any more: the exception is reported to
+  Laravel's exception handler and the send carries on.
+- **Log rows stayed Pending for ever after a blocked send.** When a later recipient of a
+  mail was blocked, the rows already written for the earlier recipients kept status `null`
+  although nothing was sent. All recipients are now checked before a row is written, and a
+  blocked send gives every recipient of that mail status `550` (`MailLog::STATUS_BLOCKED`):
+  the blocked address with its reason, the others with
+  `Not sent: {email} is blocked ({reason})`. `MailBlocked` and the `TransportException`
+  are unchanged. A row whose mailer threw an error still stays pending, because Laravel has
+  no event for a failed send.
+- **`source_file` and `source_line` always pointed at Laravel's event dispatcher.** They now
+  hold the first file outside `vendor/` and outside the package that was involved in sending
+  the mail, or `null` when there is none (a queued mail, for example).
+
+### Changed
+
+- **Changed default:** the inbox page answers 403 outside the `local` environment until the
+  host application defines the `viewMailtrap` gate. See Security above. The defaults of
+  `ui.enabled` (`true`) and `ui.middleware` (`web`) are unchanged.
+- A blocked send now writes a `550` row for every recipient of the mail, not only for the
+  blocked one, so `MailLog::blocked()` and the inbox count those rows too.
+- A recipient that appears twice in one mail in different spellings is logged once.
+- The docs, README, FAQ and Boost files describe the gate instead of an inbox that is open
+  by default.
+
 ## [1.5.1] - 2026-09-21
 
 Documentation only. Nothing in the package code, config or behaviour changed.

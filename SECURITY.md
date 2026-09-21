@@ -12,7 +12,7 @@ For example:
 
 - a webhook call that is accepted without a valid `Mailtrap-Signature`;
 - a way to change mail logs or address verdicts from outside the application;
-- the inbox UI leaking data despite its middleware;
+- the inbox UI showing data or running an action for a visitor the `viewMailtrap` gate or the middleware refuses;
 - secrets such as `MAILTRAP_API_TOKEN` or `MAILTRAP_WEBHOOK_SECRET` ending up in logs or output.
 
 ## Reporting a vulnerability

@@ -1,6 +1,6 @@
 ---
 title: "Inbox page and health check"
-description: "The Livewire and Flux inbox page of darvis/mailtrap: who can open it by default, how to protect it, layout and Tailwind setup, and mailtrap:test."
+description: "The Livewire and Flux inbox page of darvis/mailtrap: the viewMailtrap gate that decides who can open it, its settings, Tailwind setup and mailtrap:test."
 nav_order: 7
 ---
 
@@ -14,7 +14,7 @@ On the page you can:
 
 - See all logged mail with a status badge: Sent, Pending, Blocked, Invalid or Failed
 - Search by recipient, sender or subject, and filter on status
-- Open the details of one log: message id, status, error, source file and line, linked model
+- Open the details of one log: message id, status, error, linked model, and for a blocked send the file and line that sent it
 - Send a test mail to any address
 - Delete one log, or all logs older than `MAILTRAP_CLEANUP_AFTER_DAYS` with the Cleanup button
 
@@ -31,31 +31,48 @@ The path is `/mailtrap` (`MAILTRAP_UI_ROUTE`), the route name is `mailtrap.inbox
 
 ## Who can open the inbox
 
-**With the package defaults: everyone.** The default middleware is `web`, which has no login check. The component has no gate or policy of its own. So on a site where Livewire is installed and nothing else is configured, any visitor who opens `/mailtrap` can read recipients, subjects and error messages, delete logs, and send a test mail from your server to any address.
+**Outside the `local` environment: nobody, until you define the `viewMailtrap` gate.** A gate is a named yes-or-no check in Laravel's authorization. This works the way Laravel Horizon, Telescope and Pulse guard their dashboards.
 
-The only protection is the middleware list in `MAILTRAP_UI_MIDDLEWARE`. Set it before the site is reachable from the internet:
+Two checks run, in this order:
+
+1. The middleware from `MAILTRAP_UI_MIDDLEWARE` (default `web`). Put your login here, for example `web,auth`.
+2. The package middleware `Darvis\Mailtrap\Http\Middleware\AuthorizeInbox`, which answers `403` unless `Gate::allows('viewMailtrap')`. It is always the last middleware of the route and you cannot remove it through the configuration.
+
+If your application does not define the gate, the package defines it, and that default only allows the `local` environment (`APP_ENV=local`). On a staging or production site every visitor then gets `403`, logged in or not.
+
+To open the inbox on a live site, define the gate yourself. `is_admin` is an example; use whatever marks staff in your `users` table:
+
+```php
+// app/Providers/AppServiceProvider.php
+
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+
+public function boot(): void
+{
+    Gate::define('viewMailtrap', fn (?User $user) => $user?->is_admin === true);
+}
+```
+
+Write the user as nullable (`?User`). Laravel does not call a gate for a guest when the parameter is not nullable; the guest is then refused without your code running. Your gate always wins over the default, also in `local`: a gate that returns `false` closes the page there too.
+
+A login alone is not enough on a site where visitors can register: every customer has a login. That is why the gate exists next to the middleware. Still set the middleware, so a guest is sent to your login page and does not see a bare `403`:
 
 ```env
 MAILTRAP_UI_MIDDLEWARE=web,auth
 ```
 
-`auth` lets every logged-in user in. If your users are customers, use middleware that only lets staff through. Middleware is a check that runs before a page is shown; `admin` below stands for a middleware alias from your own app:
+With `auth` in the list, a guest is redirected to the route named `login`. If your app has no such route, the guest gets an error page.
 
-```env
-MAILTRAP_UI_MIDDLEWARE=web,auth,admin
-```
+The same check runs on every Livewire update request and at the start of every action of the component (`select`, `deleteLog`, `cleanup`, `sendTest`) and in its `boot()` and `render()`. So it also holds when you embed `<livewire:mailtrap-inbox />` in a page of your own, outside the package route.
 
-Or switch the page off:
+To switch the page off altogether:
 
 ```env
 MAILTRAP_UI_ENABLED=false
 ```
 
-The interactive `mailtrap:install` wizard asks this question and writes `web,auth` by default. `mailtrap:install --no-interaction` does not.
-
-With `auth` in the list, a guest is redirected to the route named `login`. If your app has no such route, the guest gets an error page.
-
-Check it: log out, open `/mailtrap` in a private browser window. You must not see the inbox.
+Check it: on the live site, open `/mailtrap` in a private browser window. You must get the login page or `403`. Then log in as a user your gate allows; you must see the inbox.
 
 ## Settings
 
@@ -63,7 +80,7 @@ Check it: log out, open `/mailtrap` in a private browser window. You must not se
 | --- | --- | --- |
 | `MAILTRAP_UI_ENABLED` | `true` | Register the page |
 | `MAILTRAP_UI_ROUTE` | `mailtrap` | Path of the page |
-| `MAILTRAP_UI_MIDDLEWARE` | `web` | Comma separated middleware; see above |
+| `MAILTRAP_UI_MIDDLEWARE` | `web` | Comma separated middleware that runs before the `viewMailtrap` gate; see above |
 | `MAILTRAP_UI_LAYOUT` | `components.layouts.app` | The Blade layout the page is rendered in, in dot notation. `layouts.app` means `resources/views/layouts/app.blade.php`. |
 | `MAILTRAP_UI_PER_PAGE` | `25` | Rows per page |
 

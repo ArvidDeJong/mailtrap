@@ -37,7 +37,7 @@ php artisan mailtrap:install
 php artisan mailtrap:test you@example.com
 ```
 
-`mailtrap:install` is a setup wizard that also runs the migrations. It asks who may open the inbox page. With the package defaults that page is open to every visitor, so read [who can open the inbox](inbox.md#who-can-open-the-inbox) before you deploy.
+`mailtrap:install` is a setup wizard that also runs the migrations. The inbox page answers `403` outside the `local` environment until you define the `viewMailtrap` gate; see [who can open the inbox](inbox.md#who-can-open-the-inbox).
 
 ## Pages
 
