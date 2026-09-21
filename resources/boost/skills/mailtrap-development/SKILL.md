@@ -80,8 +80,10 @@ $body = json_encode(['events' => [[
     'event' => 'bounce', 'email' => 'a@example.org', 'message_id' => 'abc', 'response_code' => 550,
 ]]]);
 
+// Set manta_mailtrap.webhook.secret in the test first; without a secret every call gets 403.
 $this->call('POST', '/api/webhooks/mailtrap', server: [
     'CONTENT_TYPE' => 'application/json',
+    'HTTP_ACCEPT' => 'application/json',
     'HTTP_MAILTRAP_SIGNATURE' => hash_hmac('sha256', $body, MailtrapConfig::webhookSecret()),
 ], content: $body)->assertOk();
 ```

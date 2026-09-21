@@ -1,31 +1,31 @@
 # Questions as people ask them to an assistant. Short, factual answers, checked against the docs.
 # Rendered on faq.md, in the FAQPage structured data and in llms.txt.
-- q: How do I log every outgoing email in Laravel?
-  a: Install `darvis/mailtrap`. Every mail the application sends is logged automatically in the `mail_logs` table, one row per recipient, and can be linked to a model with the `X-Mail-Model` and `X-Mail-Model-ID` headers.
-
-- q: Does darvis/mailtrap only work when I send through Mailtrap?
-  a: No. Address validation and mail logging work with any Laravel mailer, such as SES or Microsoft Graph. Delivery feedback through the webhook needs Mailtrap.
-
-- q: Which Mailtrap tokens does a Laravel app need?
-  a: "Two tokens and a secret: `MAIL_PASSWORD` is the sending domain token (with `MAIL_USERNAME=api`), `MAILTRAP_API_TOKEN` is an account token with Admin access that is only used to create the webhook, and `MAILTRAP_WEBHOOK_SECRET` is the webhook's signing secret."
-
-- q: How do I stop sending email to one address?
-  a: Call `EmailValidation::markAsBlocked($email, $reason)`. Mail to that address is aborted with a `TransportException`; other addresses on the same domain are not affected.
-
-- q: Does a bounce block future mail to that address?
-  a: No. Bounce, spam and reject events mark the address as invalid, which is recorded but does not stop sending. Only a blocked address stops a send.
-
-- q: How is the Mailtrap webhook secured?
-  a: The endpoint checks the HMAC-SHA256 signature of the raw request body against the `Mailtrap-Signature` header, and rejects unsigned calls with 403, also while no secret is configured.
-
-- q: Do I need Livewire to use darvis/mailtrap?
-  a: Only for the inbox UI, which needs Livewire ^3.7.4 or ^4.0 and Flux ^2.11 (the free edition). Without them the inbox is not registered and the rest of the package keeps working.
-
-- q: Which PHP and Laravel versions are supported?
-  a: PHP 8.2 or higher and Laravel 11, 12 and 13.
-
-- q: How do I check that mail works on a server?
-  a: Run `php artisan mailtrap:test you@example.com`. It sends a test mail and exits with code 0 when the mail went out.
+- q: What is darvis/mailtrap?
+  a: A Laravel package that checks every recipient before a mail goes out, logs every outgoing mail in the `mail_logs` table, processes signed Mailtrap webhook events and adds an inbox page to the application. It hooks into Laravel's mail events, so it works with every `Mail::send()` without code changes.
 
 - q: Is darvis/mailtrap an official Mailtrap package?
-  a: No. It is an independent open-source package under the MIT license, maintained by ARVID.NL.
+  a: No. It is an unofficial, independent open-source package under the MIT license, maintained by ARVID.NL. It is not made, supported or endorsed by Mailtrap.
+
+- q: How do I log every outgoing email in Laravel?
+  a: Run `composer require darvis/mailtrap` and `php artisan migrate`. Every mail the application sends is then logged in the `mail_logs` table, one row per recipient, and can be linked to a model with the `X-Mail-Model` and `X-Mail-Model-ID` headers.
+
+- q: Does darvis/mailtrap only work when I send through Mailtrap, and what does it cost?
+  a: No. Recipient validation, mail logging and the inbox page work with any Laravel mailer and need no Mailtrap account. Only the delivery feedback through the webhook needs Mailtrap Email Sending. The package itself is free.
+
+- q: Which PHP, Laravel and Livewire versions does darvis/mailtrap support?
+  a: PHP 8.2 or higher and Laravel 11, 12 and 13. Only the inbox page needs Livewire ^3.7.4 or ^4.0 and Flux ^2.11 (the free edition); without them the rest of the package works.
+
+- q: How does darvis/mailtrap validate an email address?
+  a: It checks the format, then looks up an MX record for the domain that resolves to an IP address, and stores the verdict in the `email_validations` table. It does not connect to the mail server and does not call Mailtrap, so it cannot tell whether the mailbox exists.
+
+- q: How do I stop sending email to one address in Laravel?
+  a: Call `EmailValidation::markAsBlocked($email, $reason)`. A send to that address is aborted with a Symfony `TransportException` and logged with status 550; other addresses on the same domain are not affected. `EmailValidation::markAsValid($email)` lifts the block.
+
+- q: Does a bounce block future mail to that address?
+  a: No. Bounce, spam and reject events mark the address as `invalid`, which is recorded but does not stop sending. Only the verdict `blocked` stops a send.
+
+- q: How is the Mailtrap webhook secured?
+  a: The endpoint `POST /api/webhooks/mailtrap` compares an HMAC-SHA256 of the raw request body, keyed with `MAILTRAP_WEBHOOK_SECRET`, to the `Mailtrap-Signature` header. A call without a valid signature gets 403, and so does every call while no secret is configured.
+
+- q: Who can open the darvis/mailtrap inbox page?
+  a: With the package defaults everyone, because the default middleware is `web` without a login check. Set `MAILTRAP_UI_MIDDLEWARE=web,auth` or stricter, or `MAILTRAP_UI_ENABLED=false`. The interactive `mailtrap:install` wizard writes `web,auth` for you.

@@ -1,7 +1,7 @@
 ---
-title: FAQ
-nav_order: 7
-description: Short answers about darvis/mailtrap, mail logging, email validation and Mailtrap webhooks for Laravel.
+title: "FAQ"
+nav_order: 10
+description: "Short answers about darvis/mailtrap: what it is, whether it is official, versions, cost, how validation and blocking work, webhook security and the inbox page."
 faq: true
 ---
 

@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Documentation only. Nothing in the package code, config or behaviour changed.
+
+### Fixed
+
+- **The docs did not say that the inbox page is open by default.** `installation.md` listed
+  `MAILTRAP_UI_MIDDLEWARE=web,auth` as if it were the default. The default is `web`, without a
+  login check, so with Livewire installed every visitor can open `/mailtrap`, read recipients
+  and subjects, delete logs and send a test mail, until the host sets the variable. The
+  interactive `mailtrap:install` wizard writes `web,auth`; `--no-interaction` does not. The
+  index, installation page, inbox page, README, FAQ and Boost guideline now say so.
+- The email validation pages described the verdicts the wrong way round: `invalid` as "format
+  issues" and `blocked` as "spam domain". A failed format or MX check stores `blocked`; `invalid`
+  comes from bounce, spam and reject events or `markAsInvalid()` and does not stop a send.
+- The API reference gave `markAsInvalid()` a `?string $statusCode`; it is `int|string|null`. It
+  listed status codes `404` and `500`, which the local checks never write (they write `200` and
+  `400`), and a `CREATE TABLE` that did not match the migration: `email` and `domain` are
+  nullable, `status` is an enum, `status_code` is a string, and there is no index on
+  `last_checked_at`.
+- The bulk result examples showed `last_checked_at` as a string; it is a `Carbon` instance or `null`.
+- The "best practices" page mocked `dns_get_record` (the package calls `getmxrr()` and
+  `gethostbyname()`, and neither can be mocked that way), showed a `config/mail_validation.php`
+  with `EMAIL_VALIDATION_*` variables that do not exist, and called bulk validation "batch
+  processing": `bulkValidationWithCheck()` validates unknown addresses one by one.
+- The webhook page said each mail carries its "log id" to Mailtrap; it is the message id shared by
+  all recipients. It did not mention the `400` answer for a payload without an `events` list, the
+  three literal `403` messages, or that `delivery`, `open` and `click` store status code `200`.
+- `MailtrapEventReceived` was documented as fired for every signed event. It is not dispatched
+  for a malformed event, a duplicate within one call, or an event that failed to store.
+- The health check example used `--mailer=microsoft-graph`, a mailer Laravel does not ship.
+
+### Added
+
+- Docs pages: **Quick start** (a complete mailable, route and log query), **Testing** (the `array`
+  mailer, a verdict up front so no DNS lookup runs, a blocked recipient, a signed webhook request)
+  and **Troubleshooting** (symptom, cause and fix, with the literal error messages).
+- Installation page: numbered steps, a table of every environment variable with its default,
+  the options of `mailtrap:install`, and "Check that it works" with the real command output.
+- `tests/DocsSiteTest.php` also checks the description length, the relative links, that the index
+  links every page, and that the unofficial notice and the inbox warning stay in place.
+
+### Changed
+
+- The six pages under `docs/email-validation/` are merged into one accurate **Email validation**
+  page, so their URLs are gone. `docs/README.md` and `docs/examples/webhook-response-codes.php`
+  are removed; the site index and the webhook page replace them.
+- The README follows the standard order, has a Requirements section and no Author section, and
+  says the package is unofficial: not made, supported or endorsed by Mailtrap.
+
 ## [1.5.0] - 2026-09-20
 
 ### Added

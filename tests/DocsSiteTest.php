@@ -33,38 +33,64 @@ function docsFrontMatter(string $file): array
 }
 
 /**
- * Site pages; docs/README.md is only for browsing on GitHub and has no front matter.
+ * Site pages. Every page sits directly in docs/; there is no docs/README.md, the site is the index.
  *
  * @return array<int, string>
  */
 function docsSitePages(): array
 {
-    $pages = array_merge(glob(docsSitePath('*.md')), glob(docsSitePath('email-validation/*.md')));
-
-    return array_values(array_filter($pages, fn (string $page) => basename($page) !== 'README.md'));
+    return array_values((array) glob(docsSitePath('*.md')));
 }
 
-test('every page has a title, a unique description and a unique nav order per level', function () {
+test('every page has a title, a unique description and a unique nav order', function () {
     $pages = docsSitePages();
     $descriptions = [];
     $navOrders = [];
 
     foreach ($pages as $page) {
         $meta = docsFrontMatter($page);
-        $inSection = str_contains($page, '/email-validation/');
 
         expect($meta)->toHaveKeys(['title', 'description', 'nav_order'], basename($page));
-        expect($meta['parent'] ?? null)->toBe($inSection ? 'Email validation' : null, basename($page));
+        expect($meta)->not->toHaveKey('parent', basename($page));
+
+        // Long enough to say what the page answers, short enough for a search result.
+        expect(strlen($meta['description']))->toBeGreaterThanOrEqual(110, basename($page))
+            ->toBeLessThanOrEqual(160, basename($page));
 
         $descriptions[] = $meta['description'];
-        $navOrders[$inSection ? 'section' : 'top'][] = $meta['nav_order'];
+        $navOrders[] = $meta['nav_order'];
     }
 
-    expect(count($pages))->toBeGreaterThan(10);
     expect(array_unique($descriptions))->toHaveCount(count($pages));
+    expect(array_unique($navOrders))->toHaveCount(count($pages));
+});
 
-    foreach ($navOrders as $orders) {
-        expect(array_unique($orders))->toHaveCount(count($orders));
+test('the pages a beginner needs exist and the index links every page', function () {
+    $index = (string) file_get_contents(docsSitePath('index.md'));
+
+    foreach (['installation', 'quickstart', 'testing', 'troubleshooting', 'faq'] as $required) {
+        expect(is_file(docsSitePath($required.'.md')))->toBeTrue($required.'.md is missing');
+    }
+
+    foreach (docsSitePages() as $page) {
+        if (basename($page) === 'index.md') {
+            continue;
+        }
+
+        expect($index)->toContain('('.basename($page).')');
+    }
+
+    // docs/README.md duplicated the site; GitHub would also show it instead of index.md.
+    expect(is_file(docsSitePath('README.md')))->toBeFalse();
+});
+
+test('relative links between pages point at pages that exist', function () {
+    foreach (docsSitePages() as $page) {
+        preg_match_all('/\]\((?!https?:|mailto:|#)([^)#\s]+)(?:#[^)]*)?\)/', (string) file_get_contents($page), $links);
+
+        foreach ($links[1] as $link) {
+            expect(is_file(dirname($page).'/'.$link))->toBeTrue(basename($page).' links to '.$link);
+        }
     }
 });
 
@@ -151,13 +177,29 @@ test('the config holds the package facts and the sitemap plugin', function () {
         ->toContain('name: darvis/mailtrap')
         ->toContain('company: ARVID.NL')
         ->toContain('url: https://arvid.nl')
-        ->not->toContain('footer_content')
-        ->toMatch('/exclude:\\n  - README\\.md/');
+        ->not->toContain('footer_content');
 });
 
-test('the site says it is not an official Mailtrap product', function () {
-    expect(file_get_contents(docsSitePath('index.md')))->toContain('not an official Mailtrap product');
+test('the site, the README and the FAQ say the package is unofficial', function () {
+    expect(file_get_contents(docsSitePath('index.md')))
+        ->toContain('unofficial')
+        ->toContain('not an official Mailtrap product');
     expect(file_get_contents(docsSitePath('llms.txt')))->toContain('not an official Mailtrap product');
+    expect(file_get_contents(docsSitePath('_data/faq.yml')))->toContain('Is darvis/mailtrap an official Mailtrap package?');
+    expect(file_get_contents(dirname(__DIR__).'/README.md'))
+        ->toContain('Unofficial')
+        ->toContain('not an official Mailtrap product');
+});
+
+test('the docs say who can open the inbox with the default middleware', function () {
+    // The default is "web" without a login check. As long as that is so, the docs must say it.
+    $config = require dirname(__DIR__).'/config/manta_mailtrap.php';
+
+    expect($config['ui']['middleware'])->toBe(['web']);
+
+    foreach ([docsSitePath('inbox.md'), docsSitePath('installation.md'), dirname(__DIR__).'/README.md'] as $file) {
+        expect(str_contains((string) file_get_contents($file), 'MAILTRAP_UI_MIDDLEWARE=web,auth'))->toBeTrue(basename($file));
+    }
 });
 
 test('the footer credits ARVID.NL without a personal name', function () {
