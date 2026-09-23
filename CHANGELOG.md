@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The webhook endpoint stays on by default. `mailtrap:install` no longer writes
+  `MAILTRAP_WEBHOOK_ENABLED=false` when the site does not send through Mailtrap or when you skip
+  the webhook step; only `--without-webhook` switches it off. Without a valid signature the
+  endpoint still answers `403`. A `false` that an earlier version wrote stays in `.env`; remove
+  that line to switch the endpoint on.
+
 ## [1.7.0] - 2026-09-23
 
 ### Fixed

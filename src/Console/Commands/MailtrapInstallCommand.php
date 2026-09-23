@@ -409,10 +409,19 @@ class MailtrapInstallCommand extends Command
 
     private function stepWebhook(): bool
     {
-        if ($this->option('without-webhook') || ! $this->sendsThroughMailtrap) {
-            note('Mailtrap only sends events for mail that goes through Mailtrap, so this site does not need the webhook. The endpoint is switched off, so the site exposes no unused URL.');
+        // Only an explicit --without-webhook switches the endpoint off. Left on, it
+        // refuses every call without a valid signature, and it is ready as soon as
+        // the site starts sending through Mailtrap.
+        if ($this->option('without-webhook')) {
             $this->disableWebhook();
             $this->result('Webhook', 'skip', 'endpoint switched off');
+
+            return true;
+        }
+
+        if (! $this->sendsThroughMailtrap) {
+            note('Mailtrap only sends events for mail that goes through Mailtrap, so there is nothing to set up now. The endpoint stays on and refuses every call without a valid signature. Run this wizard again once the site sends through Mailtrap.');
+            $this->result('Webhook', 'skip', 'not needed yet; endpoint stays on');
 
             return true;
         }
@@ -431,8 +440,7 @@ class MailtrapInstallCommand extends Command
         ]));
 
         if (! $this->option('webhook') && ! confirm('Set up the webhook?', true)) {
-            $this->disableWebhook();
-            $this->result('Webhook', 'skip', 'endpoint switched off');
+            $this->result('Webhook', 'todo', 'not set up; run the wizard again to connect it');
 
             return true;
         }

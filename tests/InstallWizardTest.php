@@ -177,7 +177,7 @@ it('asks for another token when Mailtrap rejects one', function (): void {
         ->toContain('MAILTRAP_API_TOKEN=good-token')
         ->not->toContain('bad-token')
         ->toContain('MAIL_MAILER=log')
-        ->toContain('MAILTRAP_WEBHOOK_ENABLED=false')
+        ->not->toContain('MAILTRAP_WEBHOOK_ENABLED')
         ->toContain("MAILTRAP_VALIDATION_ENABLED=false\nMAILTRAP_BLOCK_INVALID_EMAILS=true")
         ->toContain('MAILTRAP_UI_ENABLED=false');
 });
@@ -228,7 +228,29 @@ it('does not treat the Email Testing sandbox as sending through Mailtrap', funct
         ->assertSuccessful();
 
     Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST');
-    expect(wizardEnv())->toContain('MAILTRAP_WEBHOOK_ENABLED=false');
+    expect(wizardEnv())->not->toContain('MAILTRAP_WEBHOOK_ENABLED');
+});
+
+it('leaves the webhook endpoint on when the user skips the webhook', function (): void {
+    fakeWizardMailtrapApi();
+
+    $this->artisan('mailtrap:install', ['--skip-migrations' => true])
+        ->expectsQuestion('Paste your Mailtrap API token', 'good-token')
+        ->expectsChoice('How does this site send mail?', 'mailtrap', MAILER_CHOICES)
+        ->expectsQuestion('Paste the SMTP password of your sending domain', 'domain-token')
+        ->expectsQuestion('Sender address (the From of every mail)', 'noreply@example.com')
+        ->expectsQuestion('Sender name (shown next to the address)', 'Acme')
+        ->expectsConfirmation('Set up the webhook?', 'no')
+        ->expectsChoice('How should recipients be checked?', 'block', VALIDATION_CHOICES)
+        ->expectsChoice('How long should mail logs be kept?', '30', RETENTION_CHOICES)
+        ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
+        ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
+        ->expectsOutputToContain('run the wizard again to connect it')
+        ->assertSuccessful();
+
+    Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST');
+    expect(wizardEnv())->not->toContain('MAILTRAP_WEBHOOK_ENABLED')
+        ->and(config('manta_mailtrap.webhook.enabled'))->toBeTrue();
 });
 
 it('stops when the app has no .env file', function (): void {

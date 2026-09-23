@@ -29,7 +29,7 @@ MAILTRAP_WEBHOOK_SECRET=the-signing-secret-of-the-webhook
 MAILTRAP_UI_MIDDLEWARE=web,auth
 ```
 
-Every other variable has a default that fits most sites. A site that does not send through Mailtrap only needs `MAILTRAP_WEBHOOK_ENABLED=false`.
+Every other variable has a default that fits most sites. The webhook endpoint is on by default, also on a site that does not send through Mailtrap: without a valid signature it answers `403`. Set `MAILTRAP_WEBHOOK_ENABLED=false` only if you want the route gone.
 
 ## Sending through Mailtrap
 
@@ -56,7 +56,7 @@ A site that sends through Mailtrap and receives its webhook needs two different 
 | `MAILTRAP_WEBHOOK_SECRET` | Signing secret of the webhook, not a token | Written by `mailtrap:webhook`, or shown in the webhook's detail panel in Mailtrap | Verifying incoming webhook calls |
 
 - `MAILTRAP_API_TOKEN` is only used while creating the webhook. At runtime the webhook needs `MAILTRAP_WEBHOOK_SECRET` and nothing else.
-- Not sending through Mailtrap? Then you need none of the three. Set `MAILTRAP_WEBHOOK_ENABLED=false` so the site exposes no unused endpoint.
+- Not sending through Mailtrap? Then you need none of the three. The endpoint can stay on: without a signing secret it answers `403` to every call. Set `MAILTRAP_WEBHOOK_ENABLED=false` if you want the route gone.
 - `mailtrap:install` asks for the signing secret when it cannot create the webhook itself, for example without an API token. Create the webhook in the Mailtrap dashboard and paste its secret.
 
 ## Validation

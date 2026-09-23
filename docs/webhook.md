@@ -12,7 +12,7 @@ A webhook is an HTTP call that another service makes to your application when so
 - **Route name**: `webhooks.mailtrap`
 - **Middleware**: `api` and `Darvis\Mailtrap\Http\Middleware\VerifyMailtrapWebhookSignature`
 
-The events only exist for mail that goes through Mailtrap. If the site sends through another mailer, set `MAILTRAP_WEBHOOK_ENABLED=false`. The route is then not registered at all.
+The events only exist for mail that goes through Mailtrap. The endpoint is on by default, also when the site sends through another mailer. It then answers `403` to every call, because there is no signing secret. Set `MAILTRAP_WEBHOOK_ENABLED=false` if you want the route not registered at all.
 
 ## Create the webhook and its secret
 
