@@ -30,6 +30,8 @@ class MailtrapInstallCommand extends Command
 
     public const MAILTRAP_SMTP_HOST = 'live.smtp.mailtrap.io';
 
+    public const MAILTRAP_BULK_SMTP_HOST = 'bulk.smtp.mailtrap.io';
+
     /**
      * @var string
      */
@@ -121,7 +123,7 @@ class MailtrapInstallCommand extends Command
         intro(' darvis/mailtrap setup ');
 
         note(implode("\n", [
-            'This wizard sets up the package in 8 short steps and explains each one.',
+            'This wizard sets up the package in 9 short steps and explains each one.',
             'Every answer is saved to .env right away. You can run it again at any time',
             'with php artisan mailtrap:install to check or change a setting.',
         ]));
@@ -133,6 +135,7 @@ class MailtrapInstallCommand extends Command
             'Sending mail' => fn (): bool => $this->stepSending(),
             'Webhook for delivery events' => fn (): bool => $this->stepWebhook(),
             'Address validation' => fn (): bool => $this->stepValidation(),
+            'Keeping mail logs' => fn (): bool => $this->stepRetention(),
             'Inbox page' => fn (): bool => $this->stepInbox(),
             'Test mail' => fn (): bool => $this->stepTestMail(),
         ];
@@ -288,7 +291,9 @@ class MailtrapInstallCommand extends Command
         $mailer = (string) config('mail.default');
         $host = (string) config('mail.mailers.smtp.host');
 
-        if ($mailer === 'smtp' && str_ends_with($host, 'smtp.mailtrap.io')) {
+        // sandbox.smtp.mailtrap.io is Email Testing: nothing is delivered and no
+        // webhook events are sent, so only the two sending hosts count.
+        if ($mailer === 'smtp' && in_array($host, [self::MAILTRAP_SMTP_HOST, self::MAILTRAP_BULK_SMTP_HOST], true)) {
             $this->sendsThroughMailtrap = true;
             $this->components->info("This site already sends through Mailtrap ({$host}).");
             $this->result('Sending mail', 'ok', "through Mailtrap ({$host})");
@@ -342,6 +347,16 @@ class MailtrapInstallCommand extends Command
             hint: 'Must be on a domain you verified in Mailtrap under Sending Domains, or Mailtrap refuses the mail.',
         );
 
+        $currentName = (string) config('mail.from.name');
+
+        $name = text(
+            'Sender name (shown next to the address)',
+            placeholder: 'Your company',
+            default: in_array($currentName, ['Example', 'Laravel'], true) ? '' : $currentName,
+            required: true,
+            hint: 'Without it recipients see the default of Laravel, often "Laravel" or "Example".',
+        );
+
         $variables = [
             'MAIL_MAILER' => 'smtp',
             'MAIL_HOST' => self::MAILTRAP_SMTP_HOST,
@@ -350,6 +365,11 @@ class MailtrapInstallCommand extends Command
             'MAIL_PASSWORD' => $smtpPassword,
             'MAIL_FROM_ADDRESS' => $from,
         ];
+
+        // Keep a MAIL_FROM_NAME="${APP_NAME}" reference when the name stays the same.
+        if ($name !== $currentName) {
+            $variables['MAIL_FROM_NAME'] = $name;
+        }
 
         // Leftovers from a previous provider, such as MAIL_SCHEME=smtps, break
         // the STARTTLS connection on port 587.
@@ -370,6 +390,7 @@ class MailtrapInstallCommand extends Command
             'mail.mailers.smtp.scheme' => isset($variables['MAIL_SCHEME']) ? 'smtp' : config('mail.mailers.smtp.scheme'),
             'mail.mailers.smtp.encryption' => isset($variables['MAIL_ENCRYPTION']) ? 'tls' : config('mail.mailers.smtp.encryption'),
             'mail.from.address' => $from,
+            'mail.from.name' => $name,
         ]);
 
         Mail::purge('smtp');
@@ -381,7 +402,7 @@ class MailtrapInstallCommand extends Command
             $this->components->warn('This is live sending: mail from this computer now reaches real recipients.');
         }
 
-        $this->result('Sending mail', 'ok', 'through Mailtrap, from '.$from);
+        $this->result('Sending mail', 'ok', "through Mailtrap, from {$name} <{$from}>");
 
         return true;
     }
@@ -398,9 +419,8 @@ class MailtrapInstallCommand extends Command
 
         if ($this->apiToken === null) {
             $this->components->warn('Creating the webhook needs the API token from step 3.');
-            $this->result('Webhook', 'todo', 'needs an API token first');
 
-            return true;
+            return $this->askForSigningSecret('needs an API token first');
         }
 
         note(implode("\n", [
@@ -461,12 +481,46 @@ class MailtrapInstallCommand extends Command
         ]));
 
         if ($exitCode !== self::SUCCESS) {
-            $this->result('Webhook', 'todo', 'not created, see the error above');
+            return $this->askForSigningSecret('not created, see the error above');
+        }
+
+        $this->result('Webhook', 'ok', $showSecret ? 'created; copy the secret to the live .env' : 'created and secret saved');
+
+        return true;
+    }
+
+    /**
+     * Fallback when the wizard cannot create the webhook itself: a webhook made
+     * in the Mailtrap dashboard works just as well once its secret is in .env.
+     */
+    private function askForSigningSecret(string $todo): bool
+    {
+        note(implode("\n", [
+            'You can also create the webhook in the Mailtrap dashboard yourself:',
+            '  1. In Mailtrap, go to Settings and open Webhooks',
+            '  2. Create a webhook for '.rtrim((string) config('app.url'), '/').'/api/webhooks/mailtrap',
+            '  3. Open its detail panel and copy the Signing secret',
+        ]));
+
+        $current = MailtrapConfig::webhookSecret();
+
+        $secret = trim(password(
+            'Paste the signing secret of the webhook',
+            hint: $current !== '' ? 'Leave empty to keep the current secret.' : 'Leave empty to skip this step for now.',
+        ));
+
+        if ($secret === '') {
+            $this->result('Webhook', $current !== '' ? 'ok' : 'todo', $current !== '' ? 'kept the current signing secret' : $todo);
 
             return true;
         }
 
-        $this->result('Webhook', 'ok', $showSecret ? 'created; copy the secret to the live .env' : 'created and secret saved');
+        $this->saveEnvironment(
+            ['MAILTRAP_WEBHOOK_ENABLED' => true, 'MAILTRAP_WEBHOOK_SECRET' => $secret],
+            ['manta_mailtrap.webhook.enabled' => true, 'manta_mailtrap.webhook.secret' => $secret],
+        );
+
+        $this->result('Webhook', 'ok', 'signing secret saved');
 
         return true;
     }
@@ -504,6 +558,38 @@ class MailtrapInstallCommand extends Command
             'log' => 'check and log only',
             default => 'off',
         });
+
+        return true;
+    }
+
+    private function stepRetention(): bool
+    {
+        note(implode("\n", [
+            'Every outgoing mail is logged with its recipients. That is personal data, so keep',
+            'it no longer than you need it. Old logs are removed by model:prune (see the summary)',
+            'and by the Cleanup button of the inbox page.',
+        ]));
+
+        $current = MailtrapConfig::cleanupAfterDays();
+
+        $options = [
+            '30' => '30 days (default)',
+            '90' => '90 days',
+            '365' => '1 year',
+            '0' => 'Keep everything',
+        ];
+
+        if (! isset($options[(string) $current])) {
+            $options = [(string) $current => "{$current} days (current)"] + $options;
+        }
+
+        $days = (int) select('How long should mail logs be kept?', $options, $current);
+
+        if ($days !== $current) {
+            $this->saveEnvironment(['MAILTRAP_CLEANUP_AFTER_DAYS' => (string) $days], ['manta_mailtrap.logging.cleanup_after_days' => $days]);
+        }
+
+        $this->result('Keeping mail logs', 'ok', $days === 0 ? 'keep everything' : "{$days} days");
 
         return true;
     }

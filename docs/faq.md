@@ -1,6 +1,6 @@
 ---
 title: "FAQ"
-nav_order: 10
+nav_order: 11
 description: "Short answers about darvis/mailtrap: what it is, whether it is official, versions, cost, how validation and blocking work, webhook security and the inbox page."
 faq: true
 ---

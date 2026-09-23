@@ -1,7 +1,7 @@
 ---
 title: "Email validation"
 description: "Check an email address in Laravel with the EmailValidation model: format and MX lookup, blocking one address, the status of a list, and every method."
-nav_order: 5
+nav_order: 6
 ---
 
 # Email validation

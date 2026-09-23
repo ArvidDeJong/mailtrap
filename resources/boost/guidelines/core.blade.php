@@ -26,7 +26,7 @@ $log->related; // the Invoice
 </code-snippet>
 @endverbatim
 
-- Setup and checks: `php artisan mailtrap:install` (interactive setup wizard: migrations, API token, Mailtrap SMTP, webhook, validation, inbox, test mail; flag-driven with `--no-interaction`), `php artisan mailtrap:webhook` (creates the webhook and writes `MAILTRAP_WEBHOOK_SECRET`), `php artisan mailtrap:test you@example.com` (exit code 0 when the mail went out).
+- Setup and checks: `php artisan mailtrap:install` (interactive setup wizard: migrations, API token, Mailtrap SMTP with sender name, webhook, validation, log retention, inbox, test mail; flag-driven with `--no-interaction`), `php artisan mailtrap:webhook` (creates the webhook and writes `MAILTRAP_WEBHOOK_SECRET`), `php artisan mailtrap:test you@example.com` (exit code 0 when the mail went out).
 - Mailtrap needs two different tokens. `MAIL_PASSWORD` (with `MAIL_USERNAME=api`) is the **sending domain** token: Sending Domains → Integration. `MAILTRAP_API_TOKEN` is an **account** token with Admin access, used only to create the webhook. Never reuse one for the other. `MAILTRAP_WEBHOOK_SECRET` is the webhook's signing secret, not a token.
 - The inbox page (`/mailtrap`, only with Livewire and Flux) is guarded by the `viewMailtrap` gate, like Horizon. Without a gate in the host application it only opens in the `local` environment and answers 403 everywhere else. Define it in `AppServiceProvider::boot()` with a nullable user, otherwise guests are refused before the gate runs. `MAILTRAP_UI_MIDDLEWARE` (for example `web,auth`) runs before the gate; don't treat a login alone as enough protection.
 

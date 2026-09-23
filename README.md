@@ -32,7 +32,7 @@ composer require darvis/mailtrap
 php artisan mailtrap:install
 ```
 
-The wizard runs the migrations and walks you through the Mailtrap tokens, the mailer, the webhook, validation and the inbox page. It writes every answer to `.env`, so run it on every server. See [Installation](https://arviddejong.github.io/mailtrap/installation.html) for the manual steps and every setting.
+The wizard runs the migrations and walks you through the Mailtrap tokens, the mailer, the webhook, validation and the inbox page. It writes every answer to `.env`, so run it on every server. See [Installation](https://arviddejong.github.io/mailtrap/installation.html) for the manual steps and [Environment variables](https://arviddejong.github.io/mailtrap/environment.html) for every `.env` variable and what it is for.
 
 ### Who can open the inbox page
 
@@ -84,7 +84,8 @@ php artisan mailtrap:test you@yourdomain.com
 
 Full documentation: **https://arviddejong.github.io/mailtrap/**
 
-- [Installation](https://arviddejong.github.io/mailtrap/installation.html): the steps, the two Mailtrap tokens, every setting, and how to check that it works
+- [Installation](https://arviddejong.github.io/mailtrap/installation.html): the steps and how to check that it works
+- [Environment variables](https://arviddejong.github.io/mailtrap/environment.html): every `.env` variable, the two Mailtrap tokens and the webhook secret
 - [Quick start](https://arviddejong.github.io/mailtrap/quickstart.html): a complete mailable that is logged and linked to a model
 - [Sending, blocking and mail logs](https://arviddejong.github.io/mailtrap/sending-and-logging.html): what happens on every send, the verdicts, scopes and events
 - [Email validation](https://arviddejong.github.io/mailtrap/email-validation.html): every method of the `EmailValidation` model

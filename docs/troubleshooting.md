@@ -1,7 +1,7 @@
 ---
 title: "Troubleshooting"
 description: "Fix problems with darvis/mailtrap: a blocked address, a webhook or inbox that answers 403, missing tables, an unstyled inbox, pending logs, cached config."
-nav_order: 9
+nav_order: 10
 ---
 
 # Troubleshooting

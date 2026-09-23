@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install darvis/mailtrap in Laravel step by step: requirements, the setup wizard, the two Mailtrap tokens, every setting and how to check that it works."
+description: "Install darvis/mailtrap in Laravel step by step: requirements, the setup wizard, running it from a deploy script, and how to check that it works."
 nav_order: 2
 ---
 
@@ -38,15 +38,16 @@ The wizard explains each step before it asks anything, and writes every answer t
 1. **Check the basics**: `.env`, `APP_URL`, the database connection, the current mailer, whether Livewire is loaded
 2. **Database tables**: runs `php artisan migrate`
 3. **Mailtrap API token**: the account token that creates the webhook; the wizard checks it with Mailtrap. Leave it empty to skip.
-4. **Sending mail**: keep your current mailer, or send through Mailtrap. For Mailtrap the wizard writes `MAIL_MAILER=smtp`, `MAIL_HOST=live.smtp.mailtrap.io`, `MAIL_PORT=587`, `MAIL_USERNAME=api`, `MAIL_PASSWORD` and `MAIL_FROM_ADDRESS`.
-5. **Webhook for delivery events**: creates the webhook and stores its signing secret. When the site does not send through Mailtrap, the wizard switches the endpoint off. On a local site it tells you to run the wizard on the live server.
+4. **Sending mail**: keep your current mailer, or send through Mailtrap. For Mailtrap the wizard writes `MAIL_MAILER=smtp`, `MAIL_HOST=live.smtp.mailtrap.io`, `MAIL_PORT=587`, `MAIL_USERNAME=api`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME`. A site that already sends through `live.smtp.mailtrap.io` or `bulk.smtp.mailtrap.io` keeps its settings. The Email Testing sandbox (`sandbox.smtp.mailtrap.io`) does not count as sending through Mailtrap, because it delivers nothing and sends no events.
+5. **Webhook for delivery events**: creates the webhook for the stream the site sends through (transactional, or bulk for `bulk.smtp.mailtrap.io`) and stores its signing secret. Without an API token, or when creating the webhook fails, it asks for the signing secret of a webhook you created in the Mailtrap dashboard instead. When the site does not send through Mailtrap, the wizard switches the endpoint off. On a local site it tells you to run the wizard on the live server.
 6. **Address validation**: check and block (default), check and only log, or off
-7. **Inbox page**: the middleware that runs before the gate, which Blade layout the page uses, and the Tailwind `@source` line. Skipped when Livewire is not loaded. The summary prints the gate from step 3.
-8. **Test mail**: sends one through `mailtrap:test`
+7. **Keeping mail logs**: how many days mail logs are kept, `MAILTRAP_CLEANUP_AFTER_DAYS`. The logs hold recipients, so this is personal data.
+8. **Inbox page**: the middleware that runs before the gate, which Blade layout the page uses, and the Tailwind `@source` line. Skipped when Livewire is not loaded. The summary prints the gate from step 3.
+9. **Test mail**: sends one through `mailtrap:test`
 
 A summary at the end lists what is still left to do. `.env` is not in git, so run the wizard on every server.
 
-Do you prefer to do it by hand? Run `php artisan migrate`, then set the variables from [Every setting](#every-setting) yourself.
+Do you prefer to do it by hand? Run `php artisan migrate`, then set the variables from [Environment variables](./environment.md) yourself.
 
 ### 3. Say who may open the inbox page
 
@@ -74,18 +75,9 @@ MAILTRAP_UI_MIDDLEWARE=web,auth
 
 Details on the [inbox page](./inbox.md#who-can-open-the-inbox).
 
-## The two Mailtrap tokens and the webhook secret
+## Environment variables
 
-A site that sends through Mailtrap and receives its webhook needs two different Mailtrap tokens, plus the webhook secret. They are often mixed up.
-
-| `.env` variable | What it is | Where the wizard tells you to find it | Used for |
-| --- | --- | --- | --- |
-| `MAIL_PASSWORD` | Token of your **sending domain** (with `MAIL_USERNAME=api`) | Mailtrap: Sending Domains → your domain → Integration → SMTP → Password | Sending mail over SMTP |
-| `MAILTRAP_API_TOKEN` | **Account** API token with Admin access | Mailtrap: Settings → API Tokens → Add Token | Creating the webhook (`mailtrap:install`, `mailtrap:webhook`) |
-| `MAILTRAP_WEBHOOK_SECRET` | Signing secret of the webhook, not a token | Written by `mailtrap:webhook`, or shown in the webhook's detail panel in Mailtrap | Verifying incoming webhook calls |
-
-- `MAILTRAP_API_TOKEN` is only used while creating the webhook. At runtime the webhook needs `MAILTRAP_WEBHOOK_SECRET` and nothing else.
-- Not sending through Mailtrap? Then you need none of the three. Set `MAILTRAP_WEBHOOK_ENABLED=false` so the site exposes no unused endpoint.
+The wizard writes everything to `.env`. [Environment variables](./environment.md) lists every variable, what it is for and where you find its value in Mailtrap.
 
 ## Check that it works
 
@@ -162,72 +154,9 @@ php artisan vendor:publish --tag=mailtrap-views        # to resources/views/vend
 
 The config key is `manta_mailtrap`, not `mailtrap`.
 
-## Every setting
-
-All settings are environment variables. The config path is the key inside `config/manta_mailtrap.php`.
-
-### Validation
-
-| Variable | Default | Config path | What it does |
-| --- | --- | --- | --- |
-| `MAILTRAP_VALIDATION_ENABLED` | `true` | `validation.enabled` | Check format and DNS of every recipient while sending. `false` skips the DNS lookups. |
-| `MAILTRAP_BLOCK_INVALID_EMAILS` | `true` | `validation.block_invalid` | Abort the send for a `blocked` address. `false` sends anyway and keeps the reason on the log. |
-| `MAILTRAP_VALIDATION_CACHE_DURATION` | `3600` | `validation.cache_duration` | Seconds a block from a local check stays in force before the address is checked again. `0` never expires. |
-
-### Logging
-
-| Variable | Default | Config path | What it does |
-| --- | --- | --- | --- |
-| `MAILTRAP_LOGGING_ENABLED` | `true` | `logging.enabled` | Write outgoing mail to `mail_logs`. |
-| `MAILTRAP_LOG_SUCCESSFUL` | `true` | `logging.log_successful` | Log mail that is sent. |
-| `MAILTRAP_LOG_FAILED` | `true` | `logging.log_failed` | Log a send that was aborted because the recipient is blocked. |
-| `MAILTRAP_CLEANUP_AFTER_DAYS` | `30` | `logging.cleanup_after_days` | Retention for the inbox Cleanup button and `model:prune`. `0` keeps everything. |
-| `MAILTRAP_LOG_TO_LARAVEL` | `false` | `logging.log_to_laravel` | Also write package messages, including webhook payloads and rejections, to the Laravel log. |
-
-### Webhook
-
-| Variable | Default | Config path | What it does |
-| --- | --- | --- | --- |
-| `MAILTRAP_WEBHOOK_ENABLED` | `true` | `webhook.enabled` | Register `POST /api/webhooks/mailtrap`. |
-| `MAILTRAP_WEBHOOK_SECRET` | empty | `webhook.secret` | The signing secret of the webhook. Without it every call gets `403`. |
-| `MAILTRAP_WEBHOOK_VERIFY_SIGNATURE` | `true` | `webhook.verify_signature` | Check the `Mailtrap-Signature` header. `false` accepts unsigned calls. |
-
-### Inbox page
-
-| Variable | Default | Config path | What it does |
-| --- | --- | --- | --- |
-| `MAILTRAP_UI_ENABLED` | `true` | `ui.enabled` | Register the inbox page. |
-| `MAILTRAP_UI_ROUTE` | `mailtrap` | `ui.route` | Path of the page. |
-| `MAILTRAP_UI_MIDDLEWARE` | `web` | `ui.middleware` | Comma separated middleware that runs before the `viewMailtrap` gate. Use `web,auth` so a guest is sent to the login page. |
-| `MAILTRAP_UI_LAYOUT` | `components.layouts.app` | `ui.layout` | Blade layout the page is rendered in. |
-| `MAILTRAP_UI_PER_PAGE` | `25` | `ui.per_page` | Rows per page. |
-
-### Mailtrap account API
-
-Only used by `mailtrap:install` and `mailtrap:webhook`.
-
-| Variable | Default | Config path | What it does |
-| --- | --- | --- | --- |
-| `MAILTRAP_API_TOKEN` | empty | `api.token` | Account API token with Admin access. |
-| `MAILTRAP_ACCOUNT_API_URL` | `https://mailtrap.io` | `api.account_url` | Base URL of the account API. |
-| `MAILTRAP_TIMEOUT` | `30` | `api.timeout` | Timeout in seconds for a call to that API. |
-
-### Keys the package does not read
-
-`api.base_url`, `validation.retry_attempts` and the sections `development` and `rate_limiting` are still in the config file but are not read by the package. They are removed in 2.0. Setting them has no effect.
-
-## After changing `.env` on a server
-
-A server with a cached configuration does not read `.env` again. After a change by hand run:
-
-```bash
-php artisan config:cache
-```
-
-`mailtrap:install` and `mailtrap:webhook` do this themselves when the configuration or the routes are cached.
-
 ## Next steps
 
+- [Environment variables](./environment.md)
 - [Quick start](./quickstart.md)
 - [Webhook](./webhook.md)
 - [Troubleshooting](./troubleshooting.md)

@@ -18,7 +18,7 @@ class MailtrapWebhookCommand extends Command
     protected $signature = 'mailtrap:webhook
         {url? : Public webhook URL (defaults to APP_URL/api/webhooks/mailtrap)}
         {--token= : Mailtrap API token with admin access (defaults to MAILTRAP_API_TOKEN)}
-        {--stream=transactional : Sending stream to subscribe to: transactional or bulk}
+        {--stream= : Sending stream to subscribe to: transactional or bulk (defaults to bulk when MAIL_HOST is bulk.smtp.mailtrap.io)}
         {--domain-id= : Only receive events for this Mailtrap sending domain}
         {--replace : Delete an existing webhook for the same URL without asking}
         {--show : Print the signing secret instead of writing it to .env}';
@@ -44,7 +44,7 @@ class MailtrapWebhookCommand extends Command
             return self::FAILURE;
         }
 
-        $stream = (string) $this->option('stream');
+        $stream = (string) ($this->option('stream') ?: $this->defaultStream());
 
         if (! in_array($stream, ['transactional', 'bulk'], true)) {
             $this->components->error('--stream must be transactional or bulk.');
@@ -117,6 +117,15 @@ class MailtrapWebhookCommand extends Command
         }
 
         return $url;
+    }
+
+    /**
+     * A webhook only receives events of its own stream, so follow the host
+     * this site sends through.
+     */
+    private function defaultStream(): string
+    {
+        return config('mail.mailers.smtp.host') === MailtrapInstallCommand::MAILTRAP_BULK_SMTP_HOST ? 'bulk' : 'transactional';
     }
 
     private function apiToken(): ?string

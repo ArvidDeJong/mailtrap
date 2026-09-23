@@ -1,7 +1,7 @@
 ---
 title: "Testing"
 description: "Test Laravel code that sends mail with darvis/mailtrap: the array mailer, a verdict up front so no DNS lookup runs, a blocked recipient, a signed webhook."
-nav_order: 8
+nav_order: 9
 ---
 
 # Testing
