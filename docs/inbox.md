@@ -1,7 +1,7 @@
 ---
 title: "Inbox page and health check"
 description: "The Livewire and Flux inbox page of darvis/mailtrap: the viewMailtrap gate that decides who can open it, its settings, Tailwind setup and mailtrap:test."
-nav_order: 7
+nav_order: 8
 ---
 
 # Inbox page and health check

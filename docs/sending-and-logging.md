@@ -1,7 +1,7 @@
 ---
 title: "Sending, blocking and mail logs"
 description: "What darvis/mailtrap does on every send in Laravel: the recipient check, which verdict stops a mail, the mail_logs columns and scopes, pruning, events."
-nav_order: 4
+nav_order: 5
 ---
 
 # Sending, blocking and mail logs

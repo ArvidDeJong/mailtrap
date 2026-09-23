@@ -55,6 +55,16 @@ it('creates the webhook and writes its signing secret to .env', function (): voi
         ->and(config('manta_mailtrap.webhook.secret'))->toBe(NEW_SECRET);
 });
 
+it('subscribes to the bulk stream when the site sends through Mailtrap bulk', function (): void {
+    fakeMailtrapApi();
+    config()->set('mail.mailers.smtp.host', 'bulk.smtp.mailtrap.io');
+
+    $this->artisan('mailtrap:webhook')->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
+        && $request['webhook']['sending_stream'] === 'bulk');
+});
+
 it('refuses a URL Mailtrap cannot reach', function (): void {
     Http::fake();
     config()->set('app.url', 'http://wijkhuis.test');

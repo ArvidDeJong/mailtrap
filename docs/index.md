@@ -41,7 +41,8 @@ php artisan mailtrap:test you@example.com
 
 ## Pages
 
-- [Installation](installation.md): requirements, the steps from `composer require` to a first logged mail, and every setting
+- [Installation](installation.md): requirements and the steps from `composer require` to a first logged mail
+- [Environment variables](environment.md): every `.env` variable, what it does, and where you find the Mailtrap tokens and the webhook secret
 - [Quick start](quickstart.md): one complete example, a mailable that is logged and linked to a model
 - [Sending, blocking and mail logs](sending-and-logging.md): what happens on every send, the verdicts, the log scopes and the events
 - [Email validation](email-validation.md): every method of the `EmailValidation` model, for one address and for a list

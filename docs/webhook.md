@@ -1,7 +1,7 @@
 ---
 title: "Webhook"
 description: "Receive Mailtrap delivery, bounce, spam and reject events in Laravel: the endpoint, how Mailtrap-Signature is checked, status codes and mailtrap:webhook."
-nav_order: 6
+nav_order: 7
 ---
 
 # Webhook
@@ -36,7 +36,7 @@ php artisan mailtrap:webhook https://example.com/api/webhooks/mailtrap --show
 | --- | --- |
 | `url` | Public webhook URL; defaults to `APP_URL/api/webhooks/mailtrap`. `localhost`, `127.0.0.1` and hosts ending in `.test`, `.local` or `.localhost` are refused. |
 | `--token=` | Account API token with Admin access; defaults to `MAILTRAP_API_TOKEN` |
-| `--stream=` | `transactional` (default) or `bulk` |
+| `--stream=` | `transactional` or `bulk`. Defaults to `bulk` when `MAIL_HOST` is `bulk.smtp.mailtrap.io`, otherwise `transactional`. A webhook only receives events of its own stream. |
 | `--domain-id=` | Only receive events for this Mailtrap sending domain |
 | `--replace` | Delete an existing webhook for the same URL without asking. Without it the command asks first. |
 | `--show` | Print the signing secret and do not write `.env` |

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `mailtrap:webhook` and the wizard subscribed the webhook to the transactional stream even when
+  the site sends through `bulk.smtp.mailtrap.io`, so no events arrived. The stream now follows
+  `MAIL_HOST`; `--stream` still overrides it.
+- The wizard treated the Email Testing sandbox (`sandbox.smtp.mailtrap.io`) as sending through
+  Mailtrap and set up a webhook that never receives events. It now asks how the site sends mail.
+
+### Changed
+
+- `mailtrap:install` now asks for `MAILTRAP_WEBHOOK_SECRET` when it cannot create the webhook
+  itself: without an API token, or when Mailtrap refuses the webhook. Create the webhook in the
+  Mailtrap dashboard and paste its signing secret; the wizard writes it to `.env`. Leave the
+  answer empty to skip the step as before.
+- The wizard asks for the sender name (`MAIL_FROM_NAME`) when it sets up sending through
+  Mailtrap, so recipients no longer see Laravel's default "Laravel" or "Example".
+- The wizard has a new step for how long mail logs are kept (`MAILTRAP_CLEANUP_AFTER_DAYS`),
+  because the logs hold recipients. It only writes `.env` when you pick another value.
+- The docs have a new [Environment variables](https://arviddejong.github.io/mailtrap/environment.html)
+  page: every `.env` variable with its default and purpose, a typical `.env`, the Laravel mail
+  settings the wizard writes, and the names of the variables the package ignores.
+
 ## [1.6.0] - 2026-09-21
 
 ### Security

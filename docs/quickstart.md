@@ -1,7 +1,7 @@
 ---
 title: "Quick start"
 description: "A complete Laravel example with darvis/mailtrap: send a mailable, link its mail log to a model, handle a blocked recipient and read the log back."
-nav_order: 3
+nav_order: 4
 ---
 
 # Quick start
