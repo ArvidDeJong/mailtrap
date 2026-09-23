@@ -110,7 +110,7 @@ With `MAILTRAP_LOG_TO_LARAVEL=true` the log shows `Mailtrap webhook rejected: no
 
 ### The webhook answers 404
 
-The route is not registered. `MAILTRAP_WEBHOOK_ENABLED` is `false` (the wizard writes that when the site does not send through Mailtrap), or the route cache is older than that setting. Set it to `true` and run `php artisan route:cache` if you cache routes.
+The route is not registered. `MAILTRAP_WEBHOOK_ENABLED` is `false` (`--without-webhook` writes that, and versions before 1.8.0 of the wizard wrote it when the site did not send through Mailtrap), or the route cache is older than that setting. Set it to `true` and run `php artisan route:cache` if you cache routes.
 
 ### The webhook answers 400: No valid events found in webhook payload
 
