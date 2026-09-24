@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.9.0] - 2026-09-24
+## [1.9.1] - 2026-09-24
+
+Replaces 1.9.0, which was tagged on the 1.8.1 code by mistake and withdrawn.
 
 ### Added
 
