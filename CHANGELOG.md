@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-09-24
+
+### Added
+
+- The interactive wizard ends with one question: star the repository on GitHub. Yes opens the
+  repository in the browser and prints the URL. The flag-driven install (`--no-interaction`)
+  never asks.
+
 ## [1.8.1] - 2026-09-24
 
 ### Changed

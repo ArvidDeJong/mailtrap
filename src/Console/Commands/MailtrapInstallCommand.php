@@ -9,6 +9,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
@@ -156,8 +157,38 @@ class MailtrapInstallCommand extends Command
 
         $this->publishConfig();
         $this->renderSummary();
+        $this->askForStar();
 
         return self::SUCCESS;
+    }
+
+    /**
+     * One question at the end of the interactive wizard, never in the
+     * flag-driven install: a star helps other developers find the package.
+     * Yes opens the repository in the browser; the URL is printed as well for
+     * a server without one.
+     */
+    private function askForStar(): void
+    {
+        $url = 'https://github.com/ArvidDeJong/mailtrap';
+
+        if (! confirm('Star darvis/mailtrap on GitHub? A star helps other developers find the package.', true, hint: $url)) {
+            return;
+        }
+
+        $this->openInBrowser($url);
+        $this->components->info("Thank you! {$url}");
+    }
+
+    private function openInBrowser(string $url): void
+    {
+        $command = match (PHP_OS_FAMILY) {
+            'Darwin' => ['open', $url],
+            'Windows' => ['cmd', '/c', 'start', '', $url],
+            default => ['xdg-open', $url],
+        };
+
+        Process::run($command);
     }
 
     private function checkBasics(): bool
