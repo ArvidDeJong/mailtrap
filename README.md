@@ -34,6 +34,32 @@ php artisan mailtrap:install
 
 The wizard runs the migrations and walks you through the Mailtrap tokens, the mailer, the webhook, validation and the inbox page. It writes every answer to `.env`, so run it on every server. See [Installation](https://arviddejong.github.io/mailtrap/installation.html) for the manual steps and [Environment variables](https://arviddejong.github.io/mailtrap/environment.html) for every `.env` variable and what it is for.
 
+### The `.env` variables you will use most
+
+The wizard writes these for you. To set them by hand:
+
+```env
+# Webhook: Mailtrap reports delivered, opened, bounced and spam per mail
+MAILTRAP_WEBHOOK_ENABLED=true
+MAILTRAP_WEBHOOK_SECRET=<signing secret of the webhook>
+MAILTRAP_API_TOKEN=<account API token with Admin access>
+```
+
+- `MAILTRAP_WEBHOOK_SECRET` is not a token you create: Mailtrap generates it for the webhook. `php artisan mailtrap:webhook` (or the wizard) creates the webhook and writes the secret for you. Made the webhook yourself in the Mailtrap dashboard? Open it under Settings → Webhooks and copy the signing secret from its detail panel. Without a secret the endpoint answers `403` to every call.
+- `MAILTRAP_API_TOKEN` is an **account** token: Mailtrap → Settings → API Tokens → Add Token, with Admin access. It is only used to create the webhook. It is **not** the SMTP password: that is the token of your sending domain (Sending Domains → your domain → Integration → SMTP) and goes in `MAIL_PASSWORD`.
+
+For more insight into what your site sends, open the inbox page at `/mailtrap`. It lists every outgoing mail with its status, bounces and errors:
+
+```env
+MAILTRAP_UI_ENABLED=true
+MAILTRAP_UI_MIDDLEWARE=web,auth
+MAILTRAP_UI_LAYOUT=layouts.app
+```
+
+- `MAILTRAP_UI_ENABLED` registers the page (on by default).
+- `MAILTRAP_UI_MIDDLEWARE` runs before the `viewMailtrap` gate below; with `auth` a guest is sent to your login page.
+- `MAILTRAP_UI_LAYOUT` is the Blade layout the page renders in, in dot notation: `layouts.app` is `resources/views/layouts/app.blade.php`. The default is `components.layouts.app`.
+
 ### Who can open the inbox page
 
 Outside the `local` environment the inbox at `/mailtrap` answers `403` until your application defines the `viewMailtrap` gate, the way Laravel Horizon does it. Add this to `AppServiceProvider::boot()` and adapt the condition to your users:
@@ -45,7 +71,7 @@ use Illuminate\Support\Facades\Gate;
 Gate::define('viewMailtrap', fn (?User $user) => $user?->is_admin === true);
 ```
 
-Set `MAILTRAP_UI_MIDDLEWARE=web,auth` as well, so a guest is sent to your login page; the wizard writes that for you. `MAILTRAP_UI_ENABLED=false` switches the page off.
+`MAILTRAP_UI_ENABLED=false` switches the page off.
 
 ## Quick start
 
