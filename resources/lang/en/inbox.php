@@ -1,0 +1,56 @@
+<?php
+
+return [
+    'all_statuses' => 'All statuses',
+    'cleanup' => 'Clean up',
+    'cleanup_confirm' => 'Delete all logs older than :days days?',
+    'close' => 'Close',
+    'columns' => [
+        'recipient' => 'Recipient',
+        'sender' => 'Sender',
+        'status' => 'Status',
+        'subject' => 'Subject',
+        'time' => 'Time',
+    ],
+    'delete' => 'Delete',
+    'delete_confirm' => 'Delete this mail log?',
+    'details' => 'Mail details',
+    'email' => 'Email address',
+    'empty' => 'No mail found.',
+    'fields' => [
+        'error' => 'Error',
+        'message_id' => 'Message-ID',
+        'model' => 'Model',
+        'sent_at' => 'Sent at',
+        'source' => 'Source',
+        'type' => 'Type',
+    ],
+    'notice' => [
+        'cleaned' => 'Deleted :count log(s) older than :days days.',
+        'deleted' => 'Mail log deleted.',
+    ],
+    'refresh' => 'Refresh',
+    'search' => 'Search recipient, sender or subject…',
+    'send' => 'Send',
+    'send_test' => 'Send test mail',
+    'sending' => 'Sending…',
+    'status' => [
+        'blocked' => 'Blocked',
+        'failed' => 'Failed',
+        'failed_code' => 'Failed (:code)',
+        'invalid' => 'Invalid',
+        'pending' => 'Pending',
+        'sent' => 'Sent',
+    ],
+    'stats' => [
+        'total' => 'Total',
+    ],
+    'subtitle' => 'Check that outgoing mail works — every send is logged here.',
+    'test' => [
+        'body' => 'Mailtrap test mail — sent at :time.',
+        'sent' => "Sent through mailer ':mailer'. The result appears in the list below.",
+        'subject' => 'Mailtrap test mail :time',
+        'subtitle' => 'Sends a mail through the active mailer (:mailer) and logs the result.',
+    ],
+    'title' => 'Mailtrap inbox',
+];

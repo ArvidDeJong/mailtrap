@@ -1,0 +1,56 @@
+<?php
+
+return [
+    'all_statuses' => 'Alle statussen',
+    'cleanup' => 'Opruimen',
+    'cleanup_confirm' => 'Alle logs ouder dan :days dagen verwijderen?',
+    'close' => 'Sluiten',
+    'columns' => [
+        'recipient' => 'Ontvanger',
+        'sender' => 'Afzender',
+        'status' => 'Status',
+        'subject' => 'Onderwerp',
+        'time' => 'Tijd',
+    ],
+    'delete' => 'Verwijderen',
+    'delete_confirm' => 'Deze maillog verwijderen?',
+    'details' => 'Maildetails',
+    'email' => 'E-mailadres',
+    'empty' => 'Geen mail gevonden.',
+    'fields' => [
+        'error' => 'Fout',
+        'message_id' => 'Message-ID',
+        'model' => 'Model',
+        'sent_at' => 'Verstuurd op',
+        'source' => 'Bron',
+        'type' => 'Type',
+    ],
+    'notice' => [
+        'cleaned' => ':count log(s) ouder dan :days dagen verwijderd.',
+        'deleted' => 'Maillog verwijderd.',
+    ],
+    'refresh' => 'Vernieuwen',
+    'search' => 'Zoek op ontvanger, afzender of onderwerp…',
+    'send' => 'Versturen',
+    'send_test' => 'Testmail versturen',
+    'sending' => 'Bezig met versturen…',
+    'status' => [
+        'blocked' => 'Geblokkeerd',
+        'failed' => 'Mislukt',
+        'failed_code' => 'Mislukt (:code)',
+        'invalid' => 'Ongeldig',
+        'pending' => 'In behandeling',
+        'sent' => 'Verstuurd',
+    ],
+    'stats' => [
+        'total' => 'Totaal',
+    ],
+    'subtitle' => 'Controleer of uitgaande mail werkt: elke verzending wordt hier gelogd.',
+    'test' => [
+        'body' => 'Mailtrap-testmail, verstuurd op :time.',
+        'sent' => "Verstuurd via mailer ':mailer'. Het resultaat verschijnt in de lijst hieronder.",
+        'subject' => 'Mailtrap-testmail :time',
+        'subtitle' => 'Verstuurt een mail via de actieve mailer (:mailer) en logt het resultaat.',
+    ],
+    'title' => 'Mailtrap-inbox',
+];
