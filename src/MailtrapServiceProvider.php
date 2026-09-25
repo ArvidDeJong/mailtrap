@@ -68,8 +68,13 @@ class MailtrapServiceProvider extends ServiceProvider
             __DIR__.'/../config/manta_mailtrap.php' => config_path('manta_mailtrap.php'),
         ], 'mailtrap-config');
 
-        // Load the package views under the "mailtrap" namespace.
+        // Load the package views and translations under the "mailtrap" namespace.
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'mailtrap');
+        $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'mailtrap');
+
+        $this->publishes([
+            __DIR__.'/../resources/lang' => $this->app->langPath('vendor/mailtrap'),
+        ], 'mailtrap-lang');
 
         $this->publishes([
             __DIR__.'/../resources/views' => resource_path('views/vendor/mailtrap'),

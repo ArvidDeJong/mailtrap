@@ -8,12 +8,10 @@ use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-#[Title('Mailtrap inbox')]
 class MailtrapInbox extends Component
 {
     use WithPagination;
@@ -75,7 +73,7 @@ class MailtrapInbox extends Component
             $this->reset('selectedId', 'showDetail');
         }
 
-        $this->notice = 'Mail log deleted.';
+        $this->notice = __('mailtrap::inbox.notice.deleted');
     }
 
     public function cleanup(): void
@@ -88,7 +86,7 @@ class MailtrapInbox extends Component
 
         $this->resetPage();
 
-        $this->notice = "Deleted {$deleted} log(s) older than {$days} days.";
+        $this->notice = __('mailtrap::inbox.notice.cleaned', ['count' => $deleted, 'days' => $days]);
     }
 
     public function sendTest(): void
@@ -101,16 +99,16 @@ class MailtrapInbox extends Component
 
         try {
             Mail::raw(
-                'Mailtrap test mail — sent at '.now()->toDateTimeString().'.',
+                __('mailtrap::inbox.test.body', ['time' => now()->toDateTimeString()]),
                 function ($message): void {
                     $message->to($this->testEmail)
-                        ->subject('Mailtrap test mail '.now()->format('H:i:s'));
+                        ->subject(__('mailtrap::inbox.test.subject', ['time' => now()->format('H:i:s')]));
                 }
             );
 
             $this->testResult = [
                 'ok' => true,
-                'message' => "Sent through mailer '".config('mail.default')."'. The result appears in the list below.",
+                'message' => __('mailtrap::inbox.test.sent', ['mailer' => config('mail.default')]),
             ];
 
             $this->resetPage();
@@ -130,11 +128,11 @@ class MailtrapInbox extends Component
     public function statusMeta(int|string|null $code): array
     {
         return match (true) {
-            $code === null => ['label' => 'Pending', 'color' => 'yellow'],
-            (string) $code === MailLog::STATUS_SENT => ['label' => 'Sent', 'color' => 'green'],
-            (string) $code === MailLog::STATUS_BLOCKED => ['label' => 'Blocked', 'color' => 'red'],
-            (int) $code === 400 => ['label' => 'Invalid', 'color' => 'orange'],
-            default => ['label' => 'Failed ('.$code.')', 'color' => 'red'],
+            $code === null => ['label' => __('mailtrap::inbox.status.pending'), 'color' => 'yellow'],
+            (string) $code === MailLog::STATUS_SENT => ['label' => __('mailtrap::inbox.status.sent'), 'color' => 'green'],
+            (string) $code === MailLog::STATUS_BLOCKED => ['label' => __('mailtrap::inbox.status.blocked'), 'color' => 'red'],
+            (int) $code === 400 => ['label' => __('mailtrap::inbox.status.invalid'), 'color' => 'orange'],
+            default => ['label' => __('mailtrap::inbox.status.failed_code', ['code' => $code]), 'color' => 'red'],
         };
     }
 
@@ -185,6 +183,7 @@ class MailtrapInbox extends Component
         AuthorizeInbox::authorize();
 
         return view('mailtrap::livewire.inbox')
-            ->layout(MailtrapConfig::uiLayout());
+            ->layout(MailtrapConfig::uiLayout())
+            ->title(__('mailtrap::inbox.title'));
     }
 }

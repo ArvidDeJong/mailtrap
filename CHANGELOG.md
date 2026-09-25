@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **The inbox speaks Dutch.** Its texts come from translations under the `mailtrap` namespace, in English and Dutch, and follow the application locale. With locale `nl` the page, its notices and the test mail are Dutch; with any other locale they are the English texts of before. Publish them with `php artisan vendor:publish --tag=mailtrap-lang` to change a text or add a language. What you do: nothing; if you published the view before, publish it again to get the translated version
+
 ## [1.9.1] - 2026-09-24
 
 Replaces 1.9.0, which was tagged on the 1.8.1 code by mistake and withdrawn.

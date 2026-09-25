@@ -96,6 +96,14 @@ Tailwind 4 only generates the classes it finds in the files it scans. Add the pa
 
 The wizard offers to add this line. Without it the inbox has no styling.
 
+## Language
+
+The inbox follows the locale of your application: English, or Dutch when the locale is `nl`. To change a text or add a language, publish the translations and edit or copy `lang/vendor/mailtrap/<locale>/inbox.php`:
+
+```bash
+php artisan vendor:publish --tag=mailtrap-lang
+```
+
 ## Change the view
 
 ```bash
