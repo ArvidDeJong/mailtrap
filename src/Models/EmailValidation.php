@@ -2,8 +2,10 @@
 
 namespace Darvis\Mailtrap\Models;
 
+use Darvis\Mailtrap\Support\DnsLookup;
 use Darvis\Mailtrap\Support\EmailAddress;
 use Darvis\Mailtrap\Support\MailtrapConfig;
+use Darvis\Mailtrap\Support\PackageLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -44,6 +46,7 @@ class EmailValidation extends Model
         'MX record does not resolve to a valid IP address',
         'MX record verwijst niet naar geldig IP-adres',
         'MX records niet gevonden',
+        'Domain does not accept mail (Null MX)',
     ];
 
     protected $table = 'email_validations';
@@ -66,7 +69,9 @@ class EmailValidation extends Model
      *
      * Checks the format, then whether the domain has a mail server that resolves
      * to an IP address. A domain on which another address is already valid skips
-     * the DNS lookups, which run synchronously while a mail is being sent.
+     * the DNS lookups, which run synchronously while a mail is being sent. A domain
+     * without MX record or with a Null MX is refused; a lookup that failed (timeout,
+     * SERVFAIL) lets the address through without storing a verdict.
      *
      * @return string|null Null when the address is valid, otherwise the reason it is not.
      */
@@ -91,25 +96,43 @@ class EmailValidation extends Model
             return null;
         }
 
-        $mxHosts = [];
+        $dns = app(DnsLookup::class);
+        $records = $dns->mxRecords($domain);
 
-        if (! getmxrr($domain, $mxHosts) || $mxHosts === []) {
+        if ($records === null) {
+            return static::letThroughUnchecked($email, 'MX lookup failed');
+        }
+
+        if ($records === []) {
             return static::rejectLocally($email, self::LOCAL_CHECK_REASONS[1]);
         }
 
-        $resolves = collect($mxHosts)->contains(function (string $host): bool {
-            $ip = gethostbyname($host);
+        // RFC 7505: a Null MX (one record pointing at ".") says the domain accepts no mail.
+        $hosts = array_values(array_filter(array_column($records, 'target'), fn (string $host): bool => $host !== ''));
 
-            return $ip !== $host && filter_var($ip, FILTER_VALIDATE_IP) !== false;
-        });
-
-        if (! $resolves) {
-            return static::rejectLocally($email, self::LOCAL_CHECK_REASONS[2]);
+        if ($hosts === []) {
+            return static::rejectLocally($email, self::LOCAL_CHECK_REASONS[5]);
         }
 
-        static::saveValidation($email, self::VALID, 'All checks passed', 200);
+        $inconclusive = false;
 
-        return null;
+        foreach ($hosts as $host) {
+            $resolves = $dns->resolves($host);
+
+            if ($resolves === true) {
+                static::saveValidation($email, self::VALID, 'All checks passed', 200);
+
+                return null;
+            }
+
+            $inconclusive = $inconclusive || $resolves === null;
+        }
+
+        if ($inconclusive) {
+            return static::letThroughUnchecked($email, 'MX host lookup failed');
+        }
+
+        return static::rejectLocally($email, self::LOCAL_CHECK_REASONS[2]);
     }
 
     /**
@@ -303,5 +326,23 @@ class EmailValidation extends Model
         static::saveValidation($email, self::BLOCKED, $reason, 400);
 
         return $reason;
+    }
+
+    /**
+     * Let an address through when DNS could not give an answer.
+     *
+     * A timeout or SERVFAIL says nothing about the address, and blocking on it
+     * would stop a real signup during a DNS hiccup. No verdict is stored, so the
+     * next mail checks again; the warning shows whether a domain keeps failing.
+     */
+    protected static function letThroughUnchecked(string $email, string $reason): null
+    {
+        PackageLog::warning('Mailtrap: DNS lookup inconclusive, recipient let through', [
+            'email' => $email,
+            'domain' => static::domainOf($email),
+            'reason' => $reason,
+        ]);
+
+        return null;
     }
 }

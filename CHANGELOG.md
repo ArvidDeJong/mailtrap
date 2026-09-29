@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **A DNS hiccup no longer blocks a real address.** The MX check used `getmxrr()`, which returns the same answer for "no MX record" and "the resolver timed out", so a bad DNS minute blocked a real signup for an hour. The lookups now use `dns_get_record()`: a timeout or SERVFAIL lets the address through without storing a verdict, and the next mail checks again. With `MAILTRAP_LOG_TO_LARAVEL=true` each case is logged as a warning. A domain without MX record is still refused. What you do: nothing
+- **A Null MX has its own reason.** A domain that publishes a Null MX (RFC 7505) is blocked with `Domain does not accept mail (Null MX)` instead of `MX record does not resolve to a valid IP address`. Like the other local checks, the block expires after `MAILTRAP_VALIDATION_CACHE_DURATION`. What you do: nothing, unless your code compares the old reason text
+- MX hosts with only an IPv6 address now count as resolving; `gethostbyname()` only looked at IPv4.
+
 ## [1.10.0] - 2026-09-25
 
 ### Added

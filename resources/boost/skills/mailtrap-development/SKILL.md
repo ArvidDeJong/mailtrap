@@ -11,7 +11,7 @@ Use this skill when code sends mail in an application that has `darvis/mailtrap`
 
 ## How a send is processed
 
-1. On `MessageSending`, every To, Cc and Bcc address runs through `EmailValidation::validateEmail()`: a format check, then the MX record and whether it resolves to an IP. The DNS lookups are skipped when another address on the domain is already valid. Set `validation.enabled` to false to skip validation altogether.
+1. On `MessageSending`, every To, Cc and Bcc address runs through `EmailValidation::validateEmail()`: a format check, then the MX record and whether it resolves to an IP. A missing MX record or a Null MX blocks the address; a DNS lookup that fails (timeout, SERVFAIL) lets it through without storing a verdict. The DNS lookups are skipped when another address on the domain is already valid. Set `validation.enabled` to false to skip validation altogether.
 2. All recipients are checked before any row is written. A `blocked` address aborts the send: every recipient of that mail gets a `MailLog` row with status `550` (the others with `Not sent: … is blocked` as error), and a `TransportException` is thrown.
 3. Otherwise one `MailLog` row per recipient is created with `status_code = null`. Every row of the mail shares the `X-Message-ID` header.
 4. On `MessageSent` those rows become `200`. Mailtrap webhook events later update the row for that recipient. The row is found through the `x_message_id` custom variable (the `X-MT-Custom-Variables` header), otherwise through Mailtrap's `message_id`.
