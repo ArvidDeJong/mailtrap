@@ -15,7 +15,9 @@ nav_order: 6
 1. **A stored verdict.** If the address already has a row, that verdict is returned without any lookup. The exception is a block from a local check that is older than `MAILTRAP_VALIDATION_CACHE_DURATION` seconds: that one is checked again.
 2. **The format**, with PHP's `FILTER_VALIDATE_EMAIL`.
 3. **A known domain.** If another address on the same domain is already `valid`, the address is stored as `valid` without a DNS lookup.
-4. **The mail server.** The domain must have an MX record (`getmxrr()`), and at least one of those hosts must resolve to an IP address (`gethostbyname()`).
+4. **The mail server.** The domain must have an MX record, and at least one of those hosts must have an IPv4 or IPv6 address. Both come from `dns_get_record()`. A Null MX (RFC 7505: one record pointing at `.`) means the domain accepts no mail and is refused.
+
+A lookup that fails (a timeout or SERVFAIL) is not a verdict on the address. The address is let through, nothing is stored, and the next mail to it checks again. With `MAILTRAP_LOG_TO_LARAVEL=true` every such case is logged as a warning, `Mailtrap: DNS lookup inconclusive, recipient let through`, with the address, the domain and the reason (`MX lookup failed` or `MX host lookup failed`).
 
 It does not connect to the mail server and does not know whether the mailbox exists. There is no call to Mailtrap.
 
@@ -26,7 +28,9 @@ The result is stored and returned:
 | Passed | `null` | `valid`, reason `All checks passed` or `Domain already verified` | `200` |
 | Bad format | `Invalid email format` | `blocked` | `400` |
 | No MX record | `No valid mail server found for domain` | `blocked` | `400` |
+| Null MX | `Domain does not accept mail (Null MX)` | `blocked` | `400` |
 | MX host without IP | `MX record does not resolve to a valid IP address` | `blocked` | `400` |
+| DNS lookup failed | `null` | nothing stored | none |
 | A stored `invalid` or `blocked` verdict | The stored reason | unchanged | unchanged |
 
 The DNS lookups are synchronous. A slow DNS server slows down the request that calls this method.

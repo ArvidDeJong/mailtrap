@@ -37,7 +37,7 @@ Two service providers, layered:
 
 On `MessageSending`, for each To, Cc and Bcc recipient:
 
-1. Run `EmailValidation::validateEmail()` (skipped when `validation.enabled` is false). It returns a cached verdict when there is one that has not gone stale. Otherwise it checks the format, then skips DNS if another address on the domain is already valid, and otherwise checks for an MX record that resolves to an IP.
+1. Run `EmailValidation::validateEmail()` (skipped when `validation.enabled` is false). It returns a cached verdict when there is one that has not gone stale. Otherwise it checks the format, then skips DNS if another address on the domain is already valid, and otherwise checks for an MX record that resolves to an IP. The lookups go through [DnsLookup](src/Support/DnsLookup.php) (`dns_get_record()`), which tells a missing record from a failed lookup: no MX or a Null MX blocks, a timeout or SERVFAIL lets the address through without a verdict. Tests swap `DnsLookup` in the container for a fake.
 2. All recipients are decided on before a row is written. If `EmailValidation::getBlockReason()` returns a reason for one of them, every recipient gets a `MailLog::STATUS_BLOCKED` (550) row via `MailLog::createWithSource()` (nothing was sent to anyone, so none may stay pending), `MailBlocked` fires for the first blocked address and a `Symfony\Component\Mailer\Exception\TransportException` aborts the send.
 3. Otherwise reuse or create the `X-Message-ID` header (one id shared by all recipients) and create a `MailLog` row with `status_code = null`. On `MessageSent`, the rows for that id are updated to `200`.
 4. Optional headers `X-Mail-Type`, `X-Mail-Model`, `X-Mail-Model-ID` are copied into the log; `MailLog::related()` resolves them as a morph relation.

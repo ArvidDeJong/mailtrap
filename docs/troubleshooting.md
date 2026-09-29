@@ -22,7 +22,8 @@ Two general rules first:
 | Reason | Cause | Fix |
 | --- | --- | --- |
 | `Invalid email format` | The address is not well-formed | Correct the address |
-| `No valid mail server found for domain` | The domain has no MX record, or the DNS lookup failed | Check the domain for a typo. If the domain is right, the block expires after `MAILTRAP_VALIDATION_CACHE_DURATION` seconds (default 3600) and the address is checked again. |
+| `No valid mail server found for domain` | The domain has no MX record | Check the domain for a typo. If the domain is right, the block expires after `MAILTRAP_VALIDATION_CACHE_DURATION` seconds (default 3600) and the address is checked again. |
+| `Domain does not accept mail (Null MX)` | The domain publishes a Null MX: it says it accepts no mail | The same |
 | `MX record does not resolve to a valid IP address` | The MX hosts of the domain have no IP address | The same |
 | Any other text | Someone called `EmailValidation::markAsBlocked()` | This block never expires. Lift it, see below. |
 
