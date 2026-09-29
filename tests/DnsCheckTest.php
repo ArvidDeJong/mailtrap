@@ -2,7 +2,8 @@
 
 use Darvis\Mailtrap\Models\EmailValidation;
 use Darvis\Mailtrap\Support\DnsLookup;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Event;
 
 /**
  * Swap the DNS lookups for fixed answers.
@@ -92,16 +93,19 @@ it('accepts an address when a later MX host resolves after an earlier lookup fai
 });
 
 it('logs an inconclusive lookup when logging to Laravel is on', function (): void {
-    config(['manta_mailtrap.logging.log_to_laravel' => true]);
-    Log::spy();
+    config(['manta_mailtrap.logging.log_to_laravel' => true, 'logging.default' => 'null']);
+    $logged = [];
+    Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged): void {
+        $logged[] = $event;
+    });
     fakeDns(null);
 
     EmailValidation::validateEmail('someone@example.org');
 
-    Log::shouldHaveReceived('log')->once()->withArgs(fn (string $level, string $message, array $context): bool => $level === 'warning'
-        && str_contains($message, 'inconclusive')
-        && $context['domain'] === 'example.org'
-        && $context['reason'] === 'MX lookup failed');
+    expect($logged)->toHaveCount(1)
+        ->and($logged[0]->level)->toBe('warning')
+        ->and($logged[0]->message)->toContain('inconclusive')
+        ->and($logged[0]->context)->toMatchArray(['domain' => 'example.org', 'reason' => 'MX lookup failed']);
 });
 
 it('checks again on the next mail after an inconclusive lookup', function (): void {
