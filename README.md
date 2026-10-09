@@ -140,7 +140,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## Support the package
 
-If darvis/mailtrap saves you time, a star on [GitHub](https://github.com/ArvidDeJong/mailtrap) or a favourite on [Packagist](https://packagist.org/packages/darvis/mailtrap) helps other developers find it.
+If darvis/mailtrap saves you time, buy me a beer 🍺: [sponsor me on GitHub](https://github.com/sponsors/ArvidDeJong).
 
 ## Contributing
 
