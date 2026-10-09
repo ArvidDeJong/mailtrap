@@ -44,7 +44,8 @@ class MailtrapWebhookCommand extends Command
             return self::FAILURE;
         }
 
-        $stream = (string) ($this->option('stream') ?: $this->defaultStream());
+        $stream = $this->option('stream');
+        $stream = is_string($stream) && $stream !== '' ? $stream : $this->defaultStream();
 
         if (! in_array($stream, ['transactional', 'bulk'], true)) {
             $this->components->error('--stream must be transactional or bulk.');
@@ -99,8 +100,11 @@ class MailtrapWebhookCommand extends Command
      */
     private function webhookUrl(): ?string
     {
-        $url = $this->argument('url')
-            ?: rtrim((string) config('app.url'), '/').'/api/webhooks/mailtrap';
+        $url = $this->argument('url');
+
+        if (! is_string($url) || $url === '') {
+            $url = rtrim((string) config('app.url'), '/').'/api/webhooks/mailtrap';
+        }
 
         $host = (string) parse_url($url, PHP_URL_HOST);
 
@@ -130,11 +134,13 @@ class MailtrapWebhookCommand extends Command
 
     private function apiToken(): ?string
     {
-        $token = $this->option('token')
-            ?: MailtrapConfig::apiToken()
-            ?: $this->environmentFile()->get('MAILTRAP_API_TOKEN');
+        $token = $this->option('token');
 
-        return $token ? (string) $token : null;
+        if (! is_string($token) || $token === '') {
+            $token = MailtrapConfig::apiToken() ?: $this->environmentFile()->get('MAILTRAP_API_TOKEN');
+        }
+
+        return is_string($token) && $token !== '' ? $token : null;
     }
 
     /**

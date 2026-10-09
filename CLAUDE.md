@@ -24,7 +24,7 @@ composer analyse              # Larastan, level 5
 
 The inbox needs Flux ≥ 2.11 (free `card`/`table`); the lowest-dependency legs catch that kind of floor. The test app loads the Livewire and Flux providers; `LivewireNotLoadedTest` covers a host without them.
 
-Tests use Orchestra Testbench with an in-memory SQLite database; migrations are loaded manually in [TestCase::runPackageMigrations()](tests/TestCase.php) (not via `loadMigrationsFrom`), so **when adding a new migration, also add it to that array** or Pest tests against it will fail with "no such table" — and, worse, the migration itself goes untested (this is how the MySQL-only `SHOW INDEX` in `000003` survived until 1.0.15).
+Tests use Orchestra Testbench with an in-memory SQLite database; migrations are loaded manually in [TestCase::runPackageMigrations()](tests/TestCase.php) (not via `loadMigrationsFrom`), so **when adding a new migration, also add it to that array** or Pest tests against it will fail with "no such table" — and, worse, the migration itself goes untested.
 
 ## Architecture
 
@@ -42,7 +42,7 @@ On `MessageSending`, for each To, Cc and Bcc recipient:
 3. Otherwise reuse or create the `X-Message-ID` header (one id shared by all recipients) and create a `MailLog` row with `status_code = null`. On `MessageSent`, the rows for that id are updated to `200`.
 4. Optional headers `X-Mail-Type`, `X-Mail-Model`, `X-Mail-Model-ID` are copied into the log; `MailLog::related()` resolves them as a morph relation.
 
-**Blocking is per address, never per domain.** Before 1.2.0 `isBlocked` also matched the domain, so one typo or manual block stopped mail to a whole provider. Only `isValid` looks at the domain, and only as a shortcut to skip DNS lookups.
+**Blocking is per address, never per domain.** Matching the domain would let one typo or manual block stop mail to a whole provider. Only `isValid` looks at the domain, and only as a shortcut to skip DNS lookups.
 
 Every write to `mail_logs` in the listeners goes through `MailServiceProvider::writeLog()`, which reports a failure and carries on. Never let the log decide whether a mail goes out: a missing table or a rejected value must not cost the host a password reset mail. Laravel has no event for a failed transport (only `MessageSending` and `MessageSent`, in 11, 12 and 13), so a row whose transport threw stays pending; that is documented, not fixable from here.
 
@@ -85,7 +85,7 @@ Walks `debug_backtrace` and records the first frame outside `vendor/`, outside t
 
 ### Migrations
 
-`message_id` on `mail_logs` was originally `unique`. Migration `2024_01_01_000003` drops that constraint (so blocked/error logs can share generated IDs and unsent attempts don't collide) and replaces it with a plain index. It detects existing indexes with `Schema::getIndexes('mail_logs')`, which is native to Laravel 11+ and works on every driver. It used raw `SHOW INDEX` until 1.0.15; that is MySQL-only syntax and broke every migration in host apps testing on SQLite. Follow the `Schema::` route for any future schema-altering migration — it satisfies the no-DBAL constraint without tying the package to one database.
+`message_id` on `mail_logs` was originally `unique`. Migration `2024_01_01_000003` drops that constraint (so blocked/error logs can share generated IDs and unsent attempts don't collide) and replaces it with a plain index. It detects existing indexes with `Schema::getIndexes('mail_logs')`, which is native to Laravel 11+ and works on every driver. Raw `SHOW INDEX` is MySQL-only syntax and breaks every migration in host apps that test on SQLite. Follow the `Schema::` route for any future schema-altering migration — it satisfies the no-DBAL constraint without tying the package to one database.
 
 ## Conventions specific to this package
 

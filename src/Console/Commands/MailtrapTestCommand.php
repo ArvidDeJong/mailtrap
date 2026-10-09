@@ -22,8 +22,10 @@ class MailtrapTestCommand extends Command
 
     public function handle(): int
     {
-        $email = (string) $this->argument('email');
-        $mailer = (string) ($this->option('mailer') ?: config('mail.default'));
+        $email = $this->argument('email');
+        $email = is_string($email) ? $email : '';
+        $mailer = $this->option('mailer');
+        $mailer = is_string($mailer) && $mailer !== '' ? $mailer : (string) config('mail.default');
 
         $beforeId = (int) (MailLog::max('id') ?? 0);
 

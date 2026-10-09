@@ -26,7 +26,7 @@ const RETENTION_CHOICES = [
 ];
 
 // The wizard ends with this question; every successful run has to answer it.
-const STAR_QUESTION = 'Star darvis/mailtrap on GitHub? A star helps other developers find the package.';
+const SPONSOR_QUESTION = 'Buy me a beer? 🍺 Sponsoring on GitHub keeps darvis/mailtrap maintained.';
 
 const INBOX_CHOICES = [
     'auth' => 'Only logged-in users (middleware web, auth)',
@@ -94,7 +94,7 @@ it('walks a live site through mailer, webhook, validation and inbox', function (
         ->expectsQuestion('The layout components.layouts.app does not exist. Which Blade layout do your pages use?', '')
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
         ->expectsOutputToContain("Gate::define('viewMailtrap', fn (?User \$user) => \$user?->is_admin === true);")
-        ->expectsConfirmation(STAR_QUESTION, 'no')
+        ->expectsConfirmation(SPONSOR_QUESTION, 'no')
         ->assertSuccessful();
 
     Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
@@ -133,7 +133,7 @@ it('sets up sending through Mailtrap without an account API token', function ():
         ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
         ->expectsOutputToContain('needs an API token first')
-        ->expectsConfirmation(STAR_QUESTION, 'no')
+        ->expectsConfirmation(SPONSOR_QUESTION, 'no')
         ->assertSuccessful();
 
     expect(wizardEnv())
@@ -158,7 +158,7 @@ it('asks for the signing secret of a dashboard webhook when there is no API toke
         ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
         ->expectsOutputToContain('signing secret saved')
-        ->expectsConfirmation(STAR_QUESTION, 'no')
+        ->expectsConfirmation(SPONSOR_QUESTION, 'no')
         ->assertSuccessful();
 
     Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST');
@@ -179,7 +179,7 @@ it('asks for another token when Mailtrap rejects one', function (): void {
         ->expectsChoice('How long should mail logs be kept?', '30', RETENTION_CHOICES)
         ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
-        ->expectsConfirmation(STAR_QUESTION, 'no')
+        ->expectsConfirmation(SPONSOR_QUESTION, 'no')
         ->assertSuccessful();
 
     expect(wizardEnv())
@@ -213,7 +213,7 @@ it('keeps the current token and leaves the webhook for the live server on a loca
         ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
         ->expectsOutputToContain('run php artisan mailtrap:install on the live server')
-        ->expectsConfirmation(STAR_QUESTION, 'no')
+        ->expectsConfirmation(SPONSOR_QUESTION, 'no')
         ->assertSuccessful();
 
     Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST');
@@ -235,7 +235,7 @@ it('does not treat the Email Testing sandbox as sending through Mailtrap', funct
         ->expectsChoice('How long should mail logs be kept?', '30', RETENTION_CHOICES)
         ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
-        ->expectsConfirmation(STAR_QUESTION, 'no')
+        ->expectsConfirmation(SPONSOR_QUESTION, 'no')
         ->assertSuccessful();
 
     Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST');
@@ -257,7 +257,7 @@ it('leaves the webhook endpoint on when the user skips the webhook', function ()
         ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
         ->expectsOutputToContain('run the wizard again to connect it')
-        ->expectsConfirmation(STAR_QUESTION, 'no')
+        ->expectsConfirmation(SPONSOR_QUESTION, 'no')
         ->assertSuccessful();
 
     Http::assertNotSent(fn (Request $request): bool => $request->method() === 'POST');
@@ -276,7 +276,7 @@ it('stops when the app has no .env file', function (): void {
     Http::assertNothingSent();
 });
 
-it('opens the repository in the browser when the user wants to star it', function (): void {
+it('opens the sponsor page in the browser when the user wants to sponsor', function (): void {
     Http::fake();
     Process::fake();
 
@@ -287,14 +287,14 @@ it('opens the repository in the browser when the user wants to star it', functio
         ->expectsChoice('How long should mail logs be kept?', '30', RETENTION_CHOICES)
         ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
-        ->expectsConfirmation(STAR_QUESTION, 'yes')
-        ->expectsOutputToContain('https://github.com/ArvidDeJong/mailtrap')
+        ->expectsConfirmation(SPONSOR_QUESTION, 'yes')
+        ->expectsOutputToContain('https://github.com/sponsors/ArvidDeJong')
         ->assertSuccessful();
 
-    Process::assertRan(fn (PendingProcess $process): bool => in_array('https://github.com/ArvidDeJong/mailtrap', (array) $process->command, true));
+    Process::assertRan(fn (PendingProcess $process): bool => in_array('https://github.com/sponsors/ArvidDeJong', (array) $process->command, true));
 });
 
-it('does not open a browser when the user declines the star', function (): void {
+it('does not open a browser when the user declines to sponsor', function (): void {
     Http::fake();
     Process::fake();
 
@@ -305,7 +305,7 @@ it('does not open a browser when the user declines the star', function (): void 
         ->expectsChoice('How long should mail logs be kept?', '30', RETENTION_CHOICES)
         ->expectsChoice('Who may open the inbox?', 'off', INBOX_CHOICES)
         ->expectsConfirmation('Send a test mail now to check that everything works?', 'no')
-        ->expectsConfirmation(STAR_QUESTION, 'no')
+        ->expectsConfirmation(SPONSOR_QUESTION, 'no')
         ->assertSuccessful();
 
     Process::assertNothingRan();

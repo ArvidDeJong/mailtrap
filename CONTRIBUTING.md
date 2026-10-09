@@ -34,4 +34,4 @@ CI runs the tests on PHP 8.2-8.4 with Laravel 11, 12 and 13, on the lowest and t
 
 ## Code of conduct
 
-This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
+This project follows the [Contributor Covenant](https://github.com/ArvidDeJong/.github/blob/main/CODE_OF_CONDUCT.md).
