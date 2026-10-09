@@ -7,6 +7,7 @@ use Darvis\Mailtrap\Models\MailLog;
 use Darvis\Mailtrap\Support\MailtrapConfig;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -150,6 +151,9 @@ class MailtrapInbox extends Component
         ];
     }
 
+    /**
+     * @return LengthAwarePaginator<int, MailLog>
+     */
     #[Computed]
     public function logs(): LengthAwarePaginator
     {
@@ -178,7 +182,7 @@ class MailtrapInbox extends Component
         return $this->selectedId !== null ? MailLog::find($this->selectedId) : null;
     }
 
-    public function render()
+    public function render(): View
     {
         AuthorizeInbox::authorize();
 

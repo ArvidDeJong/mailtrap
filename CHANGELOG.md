@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The question at the end of the interactive wizard asks to sponsor the package on GitHub
+  ("Buy me a beer? 🍺") instead of a star. Yes opens https://github.com/sponsors/ArvidDeJong.
+- Larastan runs at level 8, like every other package. Command options and arguments are read
+  with type checks instead of string casts; no behaviour changes.
+
 ## [1.11.0] - 2026-09-29
 
 ### Changed

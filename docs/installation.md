@@ -140,7 +140,7 @@ With neither `--webhook` nor `--without-webhook` the command prints `Webhook lef
 
 ## Run the wizard again
 
-The wizard ends with one question: whether you want to star the repository on GitHub. Yes opens the repository in your browser; a star helps other developers find the package. The flag-driven install never asks.
+The wizard ends with one question: whether you want to buy the maintainer a beer by sponsoring on GitHub. Yes opens the GitHub Sponsors page in your browser. The flag-driven install never asks.
 
 The wizard is safe to run on a site that is already configured. It preselects the current settings, lets you keep or replace the API token, and offers to replace the existing webhook, because Mailtrap does not return the secret of an existing webhook. It never overwrites a published `config/manta_mailtrap.php`, but lists the keys that file lacks compared to the installed version.
 

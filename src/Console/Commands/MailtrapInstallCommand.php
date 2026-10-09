@@ -100,7 +100,8 @@ class MailtrapInstallCommand extends Command
         }
 
         $current = $this->currentApiToken();
-        $token = $this->option('token') ? (string) $this->option('token') : $current;
+        $option = $this->option('token');
+        $token = is_string($option) && $option !== '' ? $option : $current;
 
         if ($token !== null && $token !== $current) {
             $this->saveEnvironment(['MAILTRAP_API_TOKEN' => $token], ['manta_mailtrap.api.token' => $token]);
@@ -157,22 +158,22 @@ class MailtrapInstallCommand extends Command
 
         $this->publishConfig();
         $this->renderSummary();
-        $this->askForStar();
+        $this->askForSponsor();
 
         return self::SUCCESS;
     }
 
     /**
      * One question at the end of the interactive wizard, never in the
-     * flag-driven install: a star helps other developers find the package.
-     * Yes opens the repository in the browser; the URL is printed as well for
+     * flag-driven install: sponsoring keeps the package maintained. Yes opens
+     * the GitHub Sponsors page in the browser; the URL is printed as well for
      * a server without one.
      */
-    private function askForStar(): void
+    private function askForSponsor(): void
     {
-        $url = 'https://github.com/ArvidDeJong/mailtrap';
+        $url = 'https://github.com/sponsors/ArvidDeJong';
 
-        if (! confirm('Star darvis/mailtrap on GitHub? A star helps other developers find the package.', true, hint: $url)) {
+        if (! confirm('Buy me a beer? 🍺 Sponsoring on GitHub keeps darvis/mailtrap maintained.', true, hint: $url)) {
             return;
         }
 
@@ -274,7 +275,8 @@ class MailtrapInstallCommand extends Command
         ]));
 
         $current = $this->currentApiToken();
-        $token = $this->option('token') ? (string) $this->option('token') : null;
+        $option = $this->option('token');
+        $token = is_string($option) && $option !== '' ? $option : null;
 
         if ($token === null && $current !== null && confirm('Keep the current API token (…'.substr($current, -4).')?', true)) {
             $token = $current;
@@ -477,7 +479,8 @@ class MailtrapInstallCommand extends Command
         }
 
         $appUrl = rtrim((string) config('app.url'), '/');
-        $default = (string) ($this->option('url') ?: $appUrl.'/api/webhooks/mailtrap');
+        $option = $this->option('url');
+        $default = is_string($option) && $option !== '' ? $option : $appUrl.'/api/webhooks/mailtrap';
         $showSecret = false;
 
         if ($this->isLocalUrl($default)) {

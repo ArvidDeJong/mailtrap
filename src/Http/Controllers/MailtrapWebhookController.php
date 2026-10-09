@@ -88,7 +88,7 @@ class MailtrapWebhookController extends Controller
             [$status, $defaultStatusCode] = self::EVENTS[$event['event']] ?? [null, null];
             $mailLog = null;
 
-            if ($status === null) {
+            if ($status === null || $defaultStatusCode === null) {
                 PackageLog::info('Mailtrap event needs no action', $context);
                 $stats['skipped']++;
             } else {
@@ -135,13 +135,12 @@ class MailtrapWebhookController extends Controller
     {
         $email = $event['email'];
         $statusCode = (string) ($event['response_code'] ?? $defaultStatusCode);
-        $reason = $status === EmailValidation::VALID
-            ? null
-            : (string) ($event['response'] ?? $event['reason'] ?? "Mailtrap reported a {$event['event']} event");
+        $reason = null;
 
         if ($status === EmailValidation::VALID) {
             EmailValidation::markAsValid($email);
         } else {
+            $reason = (string) ($event['response'] ?? $event['reason'] ?? "Mailtrap reported a {$event['event']} event");
             EmailValidation::markAsInvalid($email, $reason, $statusCode);
         }
 
